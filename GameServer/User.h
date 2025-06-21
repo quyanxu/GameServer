@@ -681,6 +681,12 @@ struct OBJECTSTRUCT
 	int Defense;
 	int MagicDefense;
 	int DefenseSuccessRate;
+	int GateNumber; // Agrega este miembro para solucionar el error.
+	int MoveRangeStartX; // Add this member
+	int MoveRangeStartY; // Add this member if needed for consistency
+	int MoveRangeEndX;   // Add this member if needed for consistency
+	int MoveRangeEndY;   // Add this member if needed for consistency
+
 	#if(GAMESERVER_UPDATE>=701)
 	int ElementalAttribute;
 	int ElementalPattern;

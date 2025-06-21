@@ -22,6 +22,10 @@ struct GATE_INFO
 	int MinReset;
 	int MaxReset;
 	int AccountLevel;
+	int StartX; // Agregar este miembro
+	int StartY; // Agregar este miembro si también es necesario
+	int EndX; // Agregar este miembro
+	int EndY; // Agregar este miembro si también es necesario
 };
 
 class CGate

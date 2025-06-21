@@ -19,6 +19,7 @@ struct OFFEXP_DATA
 	int TuNhatItem;
 	int TuDongReset;
 	int GateNumber;
+	int Map;
 	int MapX;
 	int MapY;
 	int PhamViTrain;

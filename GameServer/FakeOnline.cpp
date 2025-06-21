@@ -165,10 +165,11 @@ void CFakeOnline::LoadFakeData(char* path)
             strncpy_s(info.Name, rInfoData.attribute("Name").as_string(""), _TRUNCATE);
             info.SkillID = rInfoData.attribute("SkillID").as_int(0); info.PVPMode = rInfoData.attribute("PVPMode").as_int(0); 
             info.UseBuffs[0] = rInfoData.attribute("UseBuffs_0").as_int(0); info.UseBuffs[1] = rInfoData.attribute("UseBuffs_1").as_int(0); info.UseBuffs[2] = rInfoData.attribute("UseBuffs_2").as_int(0);
-            info.GateNumber = rInfoData.attribute("GateNumber").as_int(0); info.MapX = rInfoData.attribute("MapX").as_int(0); info.MapY = rInfoData.attribute("MapY").as_int(0);
+            info.GateNumber = rInfoData.attribute("GateNumber").as_int(0); info.MapX = rInfoData.attribute("MapX").as_int(125); info.MapY = rInfoData.attribute("MapY").as_int(125);
             info.PhamViTrain = rInfoData.attribute("PhamViTrain").as_int(0); info.MoveRange = rInfoData.attribute("MoveRange").as_int(0); info.TimeReturn = rInfoData.attribute("TimeReturn").as_int(0);
             info.TuNhatItem = rInfoData.attribute("TuNhatItem").as_int(0); info.TuDongReset = rInfoData.attribute("TuDongReset").as_int(0);
             info.PartyMode = rInfoData.attribute("PartyMode").as_int(0); info.PostKhiDie = rInfoData.attribute("PostKhiDie").as_int(0);
+			info.Map = rInfoData.attribute("Map").as_int(0);
 			//info.MinLevel = rInfoReset.attribute("MinLevel").as_int();
 			if (strlen(info.Account) > 0) { this->m_Data.insert(std::pair<std::string, OFFEXP_DATA>(info.Account, info));}
         }
@@ -381,6 +382,31 @@ void CFakeOnline::RestoreFakeOnline()
             gObjectManager.CharacterCalcAttribute(aIndex); 
             LogAdd(LOG_RED, "[FakeOnline]  [TK: %s NV: %s][Cls:%d] Da Online Vao Server. PVPMode:%d. PhysiSpeed:%d. DBClass:%d", 
                    it->second.Account, it->second.Name, lpObj->Class, lpObj->IsFakePVPMode, lpObj->PhysiSpeed, lpObj->DBClass);
+		
+			// === AGREGADO PARA VISUALIZACIÓN CORRECTA EN TODOS LOS MAPAS ===
+
+				// Asignar coordenadas y mapa del bot según info (ajusta si tu estructura cambia)
+			lpObj->Map = it->second.Map;
+			lpObj->X = it->second.MapX;
+			lpObj->Y = it->second.MapY;
+
+			// ASIGNA EL GATENUMBER PARA LÓGICA DE MOVIMIENTO
+			lpObj->GateNumber = it->second.GateNumber;
+
+			GATE_INFO gateInfo = { 0 };
+			if (gGate.GetInfo(lpObj->GateNumber, &gateInfo))
+			{
+				// Ajusta los nombres según tu struct LPOBJ si es necesario
+				lpObj->MoveRangeStartX = gateInfo.X;
+				lpObj->MoveRangeStartY = gateInfo.Y;
+				lpObj->MoveRangeEndX = gateInfo.TX;
+				lpObj->MoveRangeEndY = gateInfo.TY;
+			}
+
+			gObjViewportListCreate(lpObj->Index);
+			gObjViewportListProtocolCreate(lpObj);
+
+			LogAdd(LOG_RED, "[FakeOnline]  [TK: %s NV: %s][Cls:%d] Online at Map:%d X:%d Y:%d Gate:%d", it->second.Account, it->second.Name, lpObj->Class, lpObj->Map, lpObj->X, lpObj->Y, lpObj->GateNumber);
 		}
 	}
 }
