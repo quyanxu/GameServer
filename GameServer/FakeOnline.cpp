@@ -57,13 +57,18 @@ int g_ProbGeneral = 10, g_ProbNearRealPlayer = 15, g_ProbInParty = 12, g_ProbPVP
 // --- Fin de variables globales ---
 
 // --- Funciones de Ayuda (static para evitar conflictos) ---
-static bool FakeisJewels(int index) 
+static bool FakeisJewels(int index)
+
 {
 	if (index == GET_ITEM(12, 15) || index == GET_ITEM(14, 13) || index == GET_ITEM(14, 14) || 
 		index == GET_ITEM(14, 16) || index == GET_ITEM(14, 22) || index == GET_ITEM(14, 31) || 
 		index == GET_ITEM(14, 42) || index == GET_ITEM(14, 41) || index == GET_ITEM(14, 43) || 
-		index == GET_ITEM(12, 30) || index == GET_ITEM(12, 31) || index == GET_ITEM(12, 42) || 
-		index == GET_ITEM(12, 43) || index == GET_ITEM(12, 44)   
+		index == GET_ITEM(12, 30) || index == GET_ITEM(12, 31) || index == GET_ITEM(14, 44) ||
+		index == GET_ITEM(14, 244) || index == GET_ITEM(14, 245) || index == GET_ITEM(14, 246) ||
+		index == GET_ITEM(14, 247) || index == GET_ITEM(14, 248) || index == GET_ITEM(14, 249) ||
+		index == GET_ITEM(14, 250) || index == GET_ITEM(14, 251) || index == GET_ITEM(14, 252) ||
+		index == GET_ITEM(14, 253)
+
         ) 
 	{
 		return true;
@@ -955,7 +960,102 @@ int CFakeOnline::NhatItem(int aIndex)
 
 			bool bShouldPickThisItem = false;
 			if (lpMapItem->m_Index == GET_ITEM(14, 15)) { bShouldPickThisItem = true;} 
-			else if (FakeisJewels(lpMapItem->m_Index)) { bShouldPickThisItem = true;}
+			
+			else if (FakeisJewels(lpMapItem->m_Index))
+			{
+				if (lpMapItem->m_Index == GET_ITEM(14, 13)) { // Jewel of Bless
+					lpObj->BlessBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Bless (BANCO), total: %d", lpObj->Name, lpObj->BlessBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 14)) { // Jewel of Soul
+					lpObj->SoulBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Soul (BANCO), total: %d", lpObj->Name, lpObj->SoulBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(12, 15)) { // Chaos
+					lpObj->ChaosBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Chaos Jewel (BANCO), total: %d", lpObj->Name, lpObj->ChaosBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 16)) { // Life
+					lpObj->LifeBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Life (BANCO), total: %d", lpObj->Name, lpObj->LifeBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 22)) { // Creation
+					lpObj->CreateonBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Creation (BANCO), total: %d", lpObj->Name, lpObj->CreateonBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 31)) { // Guardian
+					lpObj->GuardianBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Guardian (BANCO), total: %d", lpObj->Name, lpObj->GuardianBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 42)) { // Harmony
+					lpObj->HarmonyBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Jewel of Harmony (BANCO), total: %d", lpObj->Name, lpObj->HarmonyBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 43)) { // LowStone
+					lpObj->LowStoneBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Lower Stone (BANCO), total: %d", lpObj->Name, lpObj->LowStoneBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 44)) { // HighStone
+					lpObj->HighStoneBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Higher Stone (BANCO), total: %d", lpObj->Name, lpObj->HighStoneBank);
+					return 1;
+				}
+				else if (lpMapItem->m_Index == GET_ITEM(14, 41)) { // GemStone
+					lpObj->GemStoneBank += 1;
+					gMap[map_num].ItemGive(aIndex, n);
+					LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ Gemstone (BANCO), total: %d", lpObj->Name, lpObj->GemStoneBank);
+					return 1;
+				}
+				// Si quieres agregar más jewels, copia este bloque y ajusta el index y la variable.
+				else {
+					// Joyas que NO van al banco: SE INSERTAN EN EL INVENTARIO
+					CItem itemForInfo;
+					itemForInfo.Convert(lpMapItem->m_Index, lpMapItem->m_Option1, lpMapItem->m_Option2, lpMapItem->m_Option3, lpMapItem->m_NewOption, lpMapItem->m_SetOption, lpMapItem->m_JewelOfHarmonyOption, lpMapItem->m_ItemOptionEx, lpMapItem->m_SocketOption, lpMapItem->m_SocketOptionBonus);
+					itemForInfo.m_Durability = lpMapItem->m_Durability;
+					itemForInfo.m_Level = lpMapItem->m_Level;
+					LogAdd(LOG_EVENT, "[FakeOnline][DEBUG] Intentando insertar joya especial %s (idx: %d) en inventario...", itemForInfo.GetName(), lpMapItem->m_Index);
+
+					BYTE resultStack = gItemManager.InventoryInsertItemStack(lpObj, lpMapItem);
+					if (resultStack != 0xFF) {
+						gMap[map_num].ItemGive(aIndex, n);
+						LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ (stack) jewel: %s en slot %d", lpObj->Name, itemForInfo.GetName(), resultStack);
+						gItemManager.GCItemModifySend(aIndex, resultStack);
+						return 1;
+					}
+					else {
+						BYTE posNoStack = gItemManager.InventoryInsertItem(aIndex, itemForInfo);
+						if (posNoStack != 0xFF) {
+							gMap[map_num].ItemGive(aIndex, n);
+							LogAdd(LOG_EVENT, "[FakeOnline][%s] RECOGIÓ (no-stack) jewel: %s en slot %d", lpObj->Name, itemForInfo.GetName(), posNoStack);
+							gItemManager.GCItemModifySend(aIndex, posNoStack);
+							return 1;
+						}
+						else {
+							LogAdd(LOG_ORANGE, "[FakeOnline][%s] Inventario lleno, no pudo recoger: %s", lpObj->Name, itemForInfo.GetName());
+							return 0;
+						}
+					}
+				}
+			}
+
+			{ bShouldPickThisItem = true;}
 			
 			if (!bShouldPickThisItem) continue; 
             
@@ -1005,6 +1105,7 @@ int CFakeOnline::NhatItem(int aIndex)
 	} 
 	return 0; 
 }
+
 void CFakeOnline::PostChatMSG(LPOBJ lpObj) 
 {
 	OFFEXP_DATA *info = this->GetOffExpInfo(lpObj); 
