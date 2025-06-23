@@ -860,6 +860,7 @@ void CFakeOnline::OnAttackAlreadyConnected(LPOBJ lpObj)
 	}
 }
 
+
 void CFakeOnline::Attack(int aIndex)
 {
 	if (OBJMAX_RANGE(aIndex) == FALSE) { return; }
@@ -879,7 +880,7 @@ void CFakeOnline::Attack(int aIndex)
 
 	this->SuDungMauMana(aIndex);
 	this->TuDongBuffSkill(aIndex);
-	this->TuDongDanhSkill(aIndex); 
+	this->TuDongDanhSkill(aIndex);
 	FakeAutoRepair(aIndex); 
 }
 

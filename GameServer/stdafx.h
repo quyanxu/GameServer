@@ -30,8 +30,8 @@ extern int Conectar;
 #define GAMESERVER_CLIENT "REAL GAMING"
 #endif
 
-#define UPDATE_GAMING 5
-#define GAMESERVER_CLIENTE_UPDATE 17
+#define UPDATE_GAMING 6
+#define GAMESERVER_CLIENTE_UPDATE 0
 #define GAMESERVER_CLIENTE_PREMIUM 0
 
 
@@ -50,7 +50,7 @@ extern int Conectar;
 #endif
 
 #ifndef GAMESERVER_UPDATE
-#define GAMESERVER_UPDATE 803
+#define GAMESERVER_UPDATE 603
 #endif
 
 #if(GAMESERVER_UPDATE==401)
@@ -117,7 +117,7 @@ extern int Conectar;
 #define CHANGECLASS          1
 #define MULTIWARE            1
 #define PARTY_SEARCH         1
-#define NEW_LICENSE			 0//------------------------------- 1
+#define NEW_LICENSE			 1//------------------------------- 1
 //-- Need All Types
 #define PG_CUSTOM			 1
 #define ALLBOTSSTRUC		 1

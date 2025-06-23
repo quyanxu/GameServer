@@ -543,6 +543,7 @@ bool CCustomPick::CommandPick(LPOBJ lpObj,char* arg)
 
 	
 #endif
+	return 0; // Return 0 if GAMESERVER_CLIENTE_UPDATE < 5
 
 }
 

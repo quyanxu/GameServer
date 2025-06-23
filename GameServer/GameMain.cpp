@@ -19,7 +19,7 @@
 #include "CustomAttack.h"
 #include "OfflineMode.h"
 #include "FakeOnline.h"
-#include "Licencia.h"
+//#include "Licencia.h"
 #include "SkyEvent.h"
 #include "SwampEvent.h"
 
@@ -40,11 +40,11 @@ void GameMainInit(HWND hwnd) // OK
 
 	PROTECT_START
 
-#if( LUIS_LICENCIA == 1)
-		
-	ReadyLicense(); //Licencia
-			
-#endif
+//#if( LUIS_LICENCIA == 1)
+//		
+//	//ReadyLicense(); //Licencia
+//			
+//#endif
 
 	gSkyEvent.Init();
 

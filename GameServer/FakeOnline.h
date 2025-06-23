@@ -28,6 +28,7 @@ struct OFFEXP_DATA
 	int PVPMode; 
 	int PartyMode;
 	int MoveRange;
+
 };
 
 struct BotActivePVPCombatState
@@ -111,5 +112,6 @@ extern int g_ProbPVP;
 extern int g_ProbMapSpecificBase; // Probabilidad si solo aplica estar en un mapa con frases específicas
 
 extern CFakeOnline s_FakeOnline;
+
 
 #endif // USE_FAKE_ONLINE == TRUE
