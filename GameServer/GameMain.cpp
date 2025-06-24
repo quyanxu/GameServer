@@ -42,7 +42,7 @@ void GameMainInit(HWND hwnd) // OK
 
 //#if( LUIS_LICENCIA == 1)
 //		
-//	//ReadyLicense(); //Licencia
+//	ReadyLicense(); //Licencia
 //			
 //#endif
 

@@ -957,9 +957,6 @@
     <ClInclude Include="YolaxD_Custom.h">
       <Filter>Source Files\CustomFeatures</Filter>
     </ClInclude>
-    <ClInclude Include="Licencia.h">
-      <Filter>Source Files\Licencia</Filter>
-    </ClInclude>
     <ClInclude Include="Achievements.h">
       <Filter>Source Files\Achievements</Filter>
     </ClInclude>
@@ -989,6 +986,9 @@
     </ClInclude>
     <ClInclude Include="FakeOnline.h">
       <Filter>Source Files\FakeOnline</Filter>
+    </ClInclude>
+    <ClInclude Include="Licencia.h">
+      <Filter>Source Files\Licencia</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1772,9 +1772,6 @@
     <ClCompile Include="YolaxD_Custom.cpp">
       <Filter>Source Files\CustomFeatures</Filter>
     </ClCompile>
-    <ClCompile Include="Licencia.cpp">
-      <Filter>Source Files\Licencia</Filter>
-    </ClCompile>
     <ClCompile Include="Achievements.cpp">
       <Filter>Source Files\Achievements</Filter>
     </ClCompile>
@@ -1801,6 +1798,9 @@
     </ClCompile>
     <ClCompile Include="FakeOnline.cpp">
       <Filter>Source Files\FakeOnline</Filter>
+    </ClCompile>
+    <ClCompile Include="Licencia.cpp">
+      <Filter>Source Files\Licencia</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
