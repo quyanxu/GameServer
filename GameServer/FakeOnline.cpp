@@ -1619,7 +1619,7 @@ void CFakeOnline::TuDongDanhSkill(int aIndex)
 
 		if (SkillRender->m_skill != SKILL_FLAME && SkillRender->m_skill != SKILL_TWISTER && SkillRender->m_skill != SKILL_EVIL_SPIRIT && SkillRender->m_skill != SKILL_HELL_FIRE && SkillRender->m_skill != SKILL_AQUA_BEAM && SkillRender->m_skill != SKILL_BLAST && SkillRender->m_skill != SKILL_INFERNO && SkillRender->m_skill != SKILL_TRIPLE_SHOT && SkillRender->m_skill != SKILL_IMPALE && SkillRender->m_skill != SKILL_MONSTER_AREA_ATTACK && SkillRender->m_skill != SKILL_PENETRATION && SkillRender->m_skill != SKILL_FIRE_SLASH && SkillRender->m_skill != SKILL_FIRE_SCREAM) {
 			if (SkillRender->m_skill != SKILL_DARK_SIDE) {
-                gAttack.Attack(lpObj, lpTargetObj, SkillRender, TRUE, 1, 1, TRUE, 1); 
+                gAttack.Attack(lpObj, lpTargetObj, SkillRender, TRUE, 1, 0, TRUE, 1); 
 			} else { 
 				this->SendRFSkillAttack(lpObj, targetIndex, SkillRender->m_index);
 			}

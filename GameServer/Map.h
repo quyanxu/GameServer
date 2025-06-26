@@ -41,6 +41,7 @@
 #define DG_MAP_RANGE(x) (((x)<MAP_DOUBLE_GOER1)?0:((x)>MAP_DOUBLE_GOER4)?0:1)
 #define IG_MAP_RANGE(x) (((x)<MAP_IMPERIAL_GUARDIAN1)?0:((x)>MAP_IMPERIAL_GUARDIAN4)?0:1)
 
+
 enum eMapNumber
 {
 	MAP_LORENCIA = 0,
