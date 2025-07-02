@@ -50,10 +50,14 @@ CFakeOnline s_FakeOnline;
 std::vector<std::string> g_BotPhrasesGeneral;
 std::vector<std::string> g_BotPhrasesNear;
 std::vector<std::string> g_BotPhrasesInParty;
-std::vector<std::string> g_BotPhrasesPVP; 
+std::vector<std::string> g_BotPhrasesPVP;
+// NUEVO: Frases por hora del día
+std::vector<std::string> g_BotPhrasesMorning;
+std::vector<std::string> g_BotPhrasesAfternoon;
+std::vector<std::string> g_BotPhrasesNight;
 std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific; 
 std::map<int, std::vector<std::string>> g_BotPhrasesClassSpecific;
-int g_ProbGeneral = 10, g_ProbNearRealPlayer = 15, g_ProbInParty = 12, g_ProbPVP = 20, g_ProbMapSpecificBase = 10, g_ProbClassSpecificBase = 11; 
+int g_ProbGeneral = 10, g_ProbNearRealPlayer = 15, g_ProbInParty = 12, g_ProbPVP = 20, g_ProbMorning = 20, g_ProbAfternoon = 20, g_ProbNight = 20, g_ProbMapSpecificBase = 10, g_ProbClassSpecificBase = 11;
 // --- Fin de variables globales ---
 
 // --- Funciones de Ayuda (static para evitar conflictos) ---
@@ -179,43 +183,169 @@ void CFakeOnline::LoadFakeData(char* path)
 
 void LoadBotPhrasesFromFile(const char* filename)
 {
-    g_BotPhrasesGeneral.clear(); g_BotPhrasesNear.clear(); g_BotPhrasesInParty.clear(); 
-    g_BotPhrasesPVP.clear(); g_BotPhrasesMapSpecific.clear(); g_BotPhrasesClassSpecific.clear(); 
-    std::ifstream file(filename); 
-    if (!file.is_open()) { return; }
-    std::string line; int mode = 0; 
-    const int MODE_NONE = 0, MODE_GENERAL = 1, MODE_NEAR = 2, MODE_IN_PARTY = 3, MODE_PVP = 4, MODE_MAP_SPECIFIC = 5, MODE_CLASS_SPECIFIC = 6; 
-    int currentMapIndexForPhrases = -1, currentDBClassForPhrases = -1; 
-    try {
-        while (std::getline(file, line)) { 
-            if (line.empty() || line[0] == ';') continue;
-            if (line[0] == '#') {
-                std::string selector_full = line; std::string selector_category = line; size_t commaPos = line.find(',');
-                if (commaPos != std::string::npos) selector_category = line.substr(0, commaPos); 
-                selector_category.erase(0, selector_category.find_first_not_of(" \t")); selector_category.erase(selector_category.find_last_not_of(" \t") + 1);
-                if (selector_category == "#GENERAL") { mode = MODE_GENERAL; if (commaPos != std::string::npos) { try { g_ProbGeneral = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}}}
-                else if (selector_category == "#NEAR_REAL_PLAYER") { mode = MODE_NEAR; if (commaPos != std::string::npos) { try { g_ProbNearRealPlayer = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}}}
-                else if (selector_category == "#IN_PARTY") { mode = MODE_IN_PARTY; if (commaPos != std::string::npos) { try { g_ProbInParty = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}}}
-                else if (selector_category == "#PVP_MODE") { mode = MODE_PVP; if (commaPos != std::string::npos) { try { g_ProbPVP = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}}}
-                else if (selector_category == "#MAP_BASE_PROB") { if (commaPos != std::string::npos) { try { g_ProbMapSpecificBase = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}} mode = MODE_NONE; }
-                else if (selector_category == "#CLASS_BASE_PROB") { if (commaPos != std::string::npos) { try { g_ProbClassSpecificBase = std::stoi(line.substr(commaPos + 1)); } catch (const std::exception&) {}} mode = MODE_NONE;}
-                else if (selector_category.rfind("#MAP_", 0) == 0) { try { currentMapIndexForPhrases = std::stoi(selector_category.substr(5)); mode = MODE_MAP_SPECIFIC; } catch (const std::exception&) { mode = MODE_NONE;}}
-                else if (selector_category.rfind("#CLASS_", 0) == 0) { try { currentDBClassForPhrases = std::stoi(selector_category.substr(7)); mode = MODE_CLASS_SPECIFIC; } catch (const std::exception&) { mode = MODE_NONE;}}
-                else mode = MODE_NONE;
-                continue;
-            }
-            std::string originalLine = line; try { size_t first = line.find_first_not_of(" \t\n\r\f\v"); if (std::string::npos == first) line.clear(); else { size_t last = line.find_last_not_of(" \t\n\r\f\v"); line = line.substr(first, (last - first + 1));}} catch (const std::out_of_range&) { line = originalLine; }
-            if (line.empty()) continue;
-            switch (mode) {
-                case MODE_GENERAL: g_BotPhrasesGeneral.push_back(line); break; case MODE_NEAR: g_BotPhrasesNear.push_back(line); break;
-                case MODE_IN_PARTY: g_BotPhrasesInParty.push_back(line); break; case MODE_PVP: g_BotPhrasesPVP.push_back(line); break;
-                case MODE_MAP_SPECIFIC: if (currentMapIndexForPhrases != -1) g_BotPhrasesMapSpecific[currentMapIndexForPhrases].push_back(line); break;
-                case MODE_CLASS_SPECIFIC: if (currentDBClassForPhrases != -1) g_BotPhrasesClassSpecific[currentDBClassForPhrases].push_back(line); break;
-            }
-        }
-    } catch (...) {}
-    if (file.is_open()) file.close();
+	g_BotPhrasesGeneral.clear();
+	g_BotPhrasesNear.clear();
+	g_BotPhrasesInParty.clear();
+	g_BotPhrasesPVP.clear();
+	g_BotPhrasesMapSpecific.clear();
+	g_BotPhrasesClassSpecific.clear();
+	g_BotPhrasesMorning.clear();
+	g_BotPhrasesAfternoon.clear();
+	g_BotPhrasesNight.clear();
+
+	std::ifstream file(filename);
+	if (!file.is_open()) { return; }
+
+	std::string line;
+	int mode = 0;
+	const int MODE_NONE = 0, MODE_GENERAL = 1, MODE_NEAR = 2, MODE_IN_PARTY = 3, MODE_PVP = 4, MODE_MAP_SPECIFIC = 5, MODE_CLASS_SPECIFIC = 6;
+	int currentMapIndexForPhrases = -1, currentDBClassForPhrases = -1;
+
+	try {
+		while (std::getline(file, line)) {
+			if (line.empty() || line[0] == ';') continue;
+
+			if (line[0] == '#') {
+				std::string selector_full = line;
+				std::string selector_category = line;
+				size_t commaPos = line.find(',');
+
+				if (commaPos != std::string::npos)
+					selector_category = line.substr(0, commaPos);
+
+				selector_category.erase(0, selector_category.find_first_not_of(" \t"));
+				selector_category.erase(selector_category.find_last_not_of(" \t") + 1);
+
+				if (selector_category == "#GENERAL") {
+					mode = MODE_GENERAL;
+					if (commaPos != std::string::npos) {
+						try { g_ProbGeneral = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+				}
+				else if (selector_category == "#NEAR_REAL_PLAYER") {
+					mode = MODE_NEAR;
+					if (commaPos != std::string::npos) {
+						try { g_ProbNearRealPlayer = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+				}
+				else if (selector_category == "#IN_PARTY") {
+					mode = MODE_IN_PARTY;
+					if (commaPos != std::string::npos) {
+						try { g_ProbInParty = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+				}
+				else if (selector_category == "#PVP_MODE") {
+					mode = MODE_PVP;
+					if (commaPos != std::string::npos) {
+						try { g_ProbPVP = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+				}
+				else if (selector_category == "#MAP_BASE_PROB") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbMapSpecificBase = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = MODE_NONE;
+				}
+				else if (selector_category == "#CLASS_BASE_PROB") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbClassSpecificBase = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = MODE_NONE;
+				}
+				else if (selector_category.rfind("#MAP_", 0) == 0) {
+					try {
+						currentMapIndexForPhrases = std::stoi(selector_category.substr(5));
+						mode = MODE_MAP_SPECIFIC;
+					}
+					catch (...) {
+						mode = MODE_NONE;
+					}
+				}
+				else if (selector_category.rfind("#CLASS_", 0) == 0) {
+					try {
+						currentDBClassForPhrases = std::stoi(selector_category.substr(7));
+						mode = MODE_CLASS_SPECIFIC;
+					}
+					catch (...) {
+						mode = MODE_NONE;
+					}
+				}
+				else if (selector_category == "#MORNING") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbMorning = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = 1001;
+				}
+				else if (selector_category == "#AFTERNOON") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbAfternoon = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = 1002;
+				}
+				else if (selector_category == "#NIGHT") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbNight = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = 1003;
+				}
+				else {
+					mode = MODE_NONE;
+				}
+
+				continue;
+			}
+
+			std::string originalLine = line;
+			try {
+				size_t first = line.find_first_not_of(" \t\n\r\f\v");
+				if (std::string::npos == first) {
+					line.clear();
+				}
+				else {
+					size_t last = line.find_last_not_of(" \t\n\r\f\v");
+					line = line.substr(first, (last - first + 1));
+				}
+			}
+			catch (...) {
+				line = originalLine;
+			}
+
+			if (line.empty()) continue;
+
+			switch (mode) {
+			case MODE_GENERAL: g_BotPhrasesGeneral.push_back(line); break;
+			case MODE_NEAR: g_BotPhrasesNear.push_back(line); break;
+			case MODE_IN_PARTY: g_BotPhrasesInParty.push_back(line); break;
+			case MODE_PVP: g_BotPhrasesPVP.push_back(line); break;
+			case MODE_MAP_SPECIFIC:
+				if (currentMapIndexForPhrases != -1)
+					g_BotPhrasesMapSpecific[currentMapIndexForPhrases].push_back(line);
+				break;
+			case MODE_CLASS_SPECIFIC:
+				if (currentDBClassForPhrases != -1)
+					g_BotPhrasesClassSpecific[currentDBClassForPhrases].push_back(line);
+				break;
+			case 1001: g_BotPhrasesMorning.push_back(line); break;
+			case 1002: g_BotPhrasesAfternoon.push_back(line); break;
+			case 1003: g_BotPhrasesNight.push_back(line); break;
+			}
+		}
+	}
+	catch (...) {}
+
+	if (file.is_open())
+		file.close();
 }
+
 
 std::string GetRandomBotPhrase(int currentMap, bool realPlayerNearby, bool inParty, bool inActivePVPCombat)
 {
@@ -301,6 +431,53 @@ void CFakeOnline::AttemptRandomBotComment(int aIndex)
     bool isInParty = (lpObj->PartyNumber >= 0);
     bool botInActivePVPCombat = (this->m_botPVPCombatStates.count(aIndex) && this->m_botPVPCombatStates[aIndex].isInActiveCombat);
     
+
+	// NUEVO: Frase contextual por hora del día
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+
+	std::vector<std::string>* phrasesByTime = nullptr;
+	int prob = 0;
+
+	if (time.wHour >= 5 && time.wHour <= 11) {
+		phrasesByTime = &g_BotPhrasesMorning;
+		prob = g_ProbMorning;
+	}
+	else if (time.wHour >= 12 && time.wHour <= 18) {
+		phrasesByTime = &g_BotPhrasesAfternoon;
+		prob = g_ProbAfternoon;
+	}
+	else {
+		phrasesByTime = &g_BotPhrasesNight;
+		prob = g_ProbNight;
+	}
+
+	if (phrasesByTime && !phrasesByTime->empty()) {
+		if (rand() % 100 < prob) {
+			std::string phrase = (*phrasesByTime)[rand() % phrasesByTime->size()];
+
+			// Reemplazar {player_name} si aplica
+			if (nearbyPlayerName[0] != '\0') {
+				size_t pos = phrase.find("{player_name}");
+				if (pos != std::string::npos)
+					phrase.replace(pos, 13, nearbyPlayerName);
+			}
+
+			char msg[MAX_CHAT_MESSAGE_SIZE + 1] = { 0 };
+			strncpy_s(msg, sizeof(msg), phrase.c_str(), _TRUNCATE);
+
+			// Enviar por chat local directamente
+			PostMessage1(lpObj->Name, gMessage.GetMessage(69), msg);
+
+			this->m_dwLastCommentTick[aIndex] = GetTickCount();
+			this->m_dwLastLocalChatTick[aIndex] = GetTickCount();
+			LeaveCriticalSection(&this->m_BotDataMutex);
+			return;
+		}
+	}
+
+
+
     std::string phrase = GetRandomBotPhrase(lpObj->DBClass, lpObj->Map, realPlayerNearby, isInParty, botInActivePVPCombat);
     
     if (phrase.empty()) {

@@ -110,6 +110,7 @@ extern int Conectar;
 #define BOT_BUFFER			 1
 #define BOT_ALCHEMIST		 1 
 #define BOT_STORE			 1
+#define BOT_TRADER			 1
 
 #define ARCA_WAR			 2	// Mix nomas!!
 #define GOLDEN_ARCHER		 2	// 

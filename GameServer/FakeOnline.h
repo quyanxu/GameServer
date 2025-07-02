@@ -101,7 +101,11 @@ std::string GetRandomBotPhrase(int currentMap, bool realPlayerNearby, bool inPar
 extern std::vector<std::string> g_BotPhrasesGeneral;
 extern std::vector<std::string> g_BotPhrasesNear;
 extern std::vector<std::string> g_BotPhrasesInParty; 
-extern std::vector<std::string> g_BotPhrasesPVP; 
+extern std::vector<std::string> g_BotPhrasesPVP;
+// NUEVO: Frases según hora del día
+extern std::vector<std::string> g_BotPhrasesMorning;
+extern std::vector<std::string> g_BotPhrasesAfternoon;
+extern std::vector<std::string> g_BotPhrasesNight;
 extern std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific; 
 
 // NUEVO: Variables globales para probabilidades configurables
@@ -109,6 +113,10 @@ extern int g_ProbGeneral;
 extern int g_ProbNearRealPlayer;
 extern int g_ProbInParty;
 extern int g_ProbPVP;
+// NUEVO: Probabilidades para hora del día
+extern int g_ProbMorning;
+extern int g_ProbAfternoon;
+extern int g_ProbNight;
 extern int g_ProbMapSpecificBase; // Probabilidad si solo aplica estar en un mapa con frases específicas
 
 extern CFakeOnline s_FakeOnline;
