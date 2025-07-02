@@ -1947,6 +1947,8 @@ void CFakeOnline::SendDurationSkillAttack(LPOBJ lpObj, int target_aIndex, int Sk
 	gSkillManager.CGDurationSkillAttackRecv(&pMsg, lpObj->Index);
 }
 
+
+
 void CFakeOnline::SendRFSkillAttack(LPOBJ lpObj, int target_aIndex, int SkillNumber)
 {
 	PMSG_SKILL_DARK_SIDE_RECV MsgDS; 
@@ -2051,5 +2053,75 @@ void CFakeOnline::GuiYCParty(int aIndex, int bIndex)
 	pMsg.index[1] = SET_NUMBERLB(aIndex);
 	DataSend(bIndex, (BYTE*)&pMsg, pMsg.header.size);
 }
+
+
+void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
+{
+	if (!lpSender || !message || strlen(message) == 0)
+		return;
+
+	// Recorrer todos los bots
+	for (int i = 0; i < MAX_OBJECT; ++i)
+	{
+		LPOBJ lpBot = &gObj[i];
+		if (!lpBot->IsFakeOnline || !gObjIsConnected(i) || lpBot->Index == lpSender->Index)
+			continue;
+
+		// Debe estar en el mismo mapa y relativamente cerca (opcional)
+		if (lpBot->Map == lpSender->Map && gObjCalcDistance(lpBot, lpSender) < 10)
+		
+	
+		{
+			// Cooldown de respuesta
+			DWORD tick = GetTickCount();
+			if ((tick - this->m_dwLastLocalChatTick[i]) < 30000) // 30 seg
+				continue;
+
+			// Responder con frase aleatoria de "respuesta"
+			std::vector<std::string> replyOptions;
+			replyOptions.push_back("¿Qué dijiste, {player_name}?");
+			replyOptions.push_back("Estoy de acuerdo contigo, {player_name}.");
+			replyOptions.push_back("Interesante lo que dices, {player_name}.");
+			replyOptions.push_back("Jajaja, buena esa, {player_name}.");
+			replyOptions.push_back("Tienes razón, {player_name}.");
+			replyOptions.push_back("Eso me hizo reír, {player_name}.");
+			replyOptions.push_back("Así es la vida en MU, ¿no {player_name}?");
+			replyOptions.push_back("¡Qué buena frase, {player_name}!");
+			replyOptions.push_back("No lo había pensado así, {player_name}.");
+			replyOptions.push_back("¡Totalmente cierto, {player_name}!");
+			replyOptions.push_back("Apoyo esa emoción, {player_name}.");
+			replyOptions.push_back("Sabes mucho de MU, {player_name}.");
+			replyOptions.push_back("Ja, justo pensaba lo mismo, {player_name}.");
+			replyOptions.push_back("Cuidado con lo que dices, {player_name}...");
+			replyOptions.push_back("Eso sonó profundo, {player_name}.");
+			replyOptions.push_back("¡Así se habla, {player_name}!");
+			replyOptions.push_back("Buena observación, {player_name}.");
+			replyOptions.push_back("No esperaba oír eso de ti, {player_name}.");
+			replyOptions.push_back("¿Tú también lo notaste, {player_name}?");
+			replyOptions.push_back("¡Sabías palabras, {player_name}!");
+		
+
+			std::string reply = replyOptions[rand() % replyOptions.size()];
+			size_t pos = reply.find("{player_name}");
+			if (pos != std::string::npos)
+				reply.replace(pos, 13, lpSender->Name);
+
+			char msg[80] = { 0 };
+			strncpy_s(msg, reply.c_str(), _TRUNCATE);
+
+			PMSG_CHAT_RECV chatMsg;
+			memset(&chatMsg, 0, sizeof(chatMsg));
+			chatMsg.header.set(0x00, sizeof(chatMsg));
+			strncpy_s(chatMsg.name, lpBot->Name, sizeof(chatMsg.name) - 1);
+			strncpy_s(chatMsg.message, msg, sizeof(chatMsg.message) - 1);
+
+			CGChatRecv(&chatMsg, lpBot->Index);
+			LogAdd(LOG_EVENT, "[FakeOnline][%s] RESPONDE A %s: \"%s\"", lpBot->Name, lpSender->Name, msg);
+
+			this->m_dwLastLocalChatTick[i] = tick;
+		}
+	}
+}
+
 
 #endif // USE_FAKE_ONLINE == TRUE

@@ -1483,7 +1483,13 @@ void CGChatRecv(PMSG_CHAT_RECV* lpMsg,int aIndex) // OK
 		DataSend(aIndex,(BYTE*)&pMsg,pMsg.header.size);
 		MsgSendV2(lpObj,(BYTE*)&pMsg,pMsg.header.size);
 	}
+	if (lpObj->IsFakeOnline == 0) {
+		s_FakeOnline.ChatRecv(lpObj, lpMsg->message);
+	}
+
 }
+
+
 
 void CGChatWhisperRecv(PMSG_CHAT_WHISPER_RECV* lpMsg,int aIndex) // OK
 {

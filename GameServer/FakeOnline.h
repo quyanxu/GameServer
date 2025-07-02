@@ -78,6 +78,7 @@ public:
 	void SendDurationSkillAttack(LPOBJ lpObj, int aIndex, int SkillNumber);
 	void SendRFSkillAttack(LPOBJ lpObj, int aIndex, int SkillNumber);
 	void GuiYCParty(int aIndex, int bIndex);
+	void ChatRecv(LPOBJ lpSender, const char* message);
 	
 public:
 	std::map<std::string, OFFEXP_DATA> m_Data;
@@ -120,6 +121,5 @@ extern int g_ProbNight;
 extern int g_ProbMapSpecificBase; // Probabilidad si solo aplica estar en un mapa con frases específicas
 
 extern CFakeOnline s_FakeOnline;
-
 
 #endif // USE_FAKE_ONLINE == TRUE
