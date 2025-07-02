@@ -2060,46 +2060,129 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 	if (!lpSender || !message || strlen(message) == 0)
 		return;
 
-	// Recorrer todos los bots
+	std::string msgLower = message;
+	std::transform(msgLower.begin(), msgLower.end(), msgLower.begin(), ::tolower);
+
+	std::vector<std::string> saludos;
+	saludos.push_back("hola");
+	saludos.push_back("hello");
+	saludos.push_back("ola");
+	saludos.push_back("habla");
+
+	std::vector<std::string> despedidas;
+	despedidas.push_back("adios");
+	despedidas.push_back("chao");
+	despedidas.push_back("me quito");
+	despedidas.push_back("hasta luego");
+	despedidas.push_back("hablamos");
+
+	std::vector<std::string> callejeras;
+	callejeras.push_back("como estas");
+	callejeras.push_back("qué fue primo");
+	callejeras.push_back("en que estas");
+	callejeras.push_back("habla causa");
+
+	int keywordCategory = 0;
+
+	for (size_t j = 0; j < saludos.size(); ++j) {
+		if (msgLower.find(saludos[j]) != std::string::npos) {
+			keywordCategory = 1;
+			break;
+		}
+	}
+	if (keywordCategory == 0) {
+		for (size_t j = 0; j < despedidas.size(); ++j) {
+			if (msgLower.find(despedidas[j]) != std::string::npos) {
+				keywordCategory = 2;
+				break;
+			}
+		}
+	}
+	if (keywordCategory == 0) {
+		for (size_t j = 0; j < callejeras.size(); ++j) {
+			if (msgLower.find(callejeras[j]) != std::string::npos) {
+				keywordCategory = 3;
+				break;
+			}
+		}
+	}
+
 	for (int i = 0; i < MAX_OBJECT; ++i)
 	{
 		LPOBJ lpBot = &gObj[i];
 		if (!lpBot->IsFakeOnline || !gObjIsConnected(i) || lpBot->Index == lpSender->Index)
 			continue;
 
-		// Debe estar en el mismo mapa y relativamente cerca (opcional)
-		if (lpBot->Map == lpSender->Map && gObjCalcDistance(lpBot, lpSender) < 10)
-		
-	
+		if (lpBot->Map == lpSender->Map && gObjCalcDistance(lpBot, lpSender) <= 10)
 		{
-			// Cooldown de respuesta
 			DWORD tick = GetTickCount();
-			if ((tick - this->m_dwLastLocalChatTick[i]) < 30000) // 30 seg
+			if ((tick - this->m_dwLastLocalChatTick[i]) < 30000)
 				continue;
 
-			// Responder con frase aleatoria de "respuesta"
 			std::vector<std::string> replyOptions;
-			replyOptions.push_back("¿Qué dijiste, {player_name}?");
-			replyOptions.push_back("Estoy de acuerdo contigo, {player_name}.");
-			replyOptions.push_back("Interesante lo que dices, {player_name}.");
-			replyOptions.push_back("Jajaja, buena esa, {player_name}.");
-			replyOptions.push_back("Tienes razón, {player_name}.");
-			replyOptions.push_back("Eso me hizo reír, {player_name}.");
-			replyOptions.push_back("Así es la vida en MU, ¿no {player_name}?");
-			replyOptions.push_back("¡Qué buena frase, {player_name}!");
-			replyOptions.push_back("No lo había pensado así, {player_name}.");
-			replyOptions.push_back("¡Totalmente cierto, {player_name}!");
-			replyOptions.push_back("Apoyo esa emoción, {player_name}.");
-			replyOptions.push_back("Sabes mucho de MU, {player_name}.");
-			replyOptions.push_back("Ja, justo pensaba lo mismo, {player_name}.");
-			replyOptions.push_back("Cuidado con lo que dices, {player_name}...");
-			replyOptions.push_back("Eso sonó profundo, {player_name}.");
-			replyOptions.push_back("¡Así se habla, {player_name}!");
-			replyOptions.push_back("Buena observación, {player_name}.");
-			replyOptions.push_back("No esperaba oír eso de ti, {player_name}.");
-			replyOptions.push_back("¿Tú también lo notaste, {player_name}?");
-			replyOptions.push_back("¡Sabías palabras, {player_name}!");
-		
+
+			if (keywordCategory == 1) {
+				replyOptions.clear();
+				replyOptions.push_back("¡Hola, {player_name}!");
+				replyOptions.push_back("¿Qué tal, {player_name}?");
+				replyOptions.push_back("¡Buenos días, {player_name}!");
+				replyOptions.push_back("¡Al fin alguien saluda!");
+				replyOptions.push_back("Hey hey, {player_name}!");
+				replyOptions.push_back("¡Saludos desde Lorencia!");
+				replyOptions.push_back("Te estaba esperando, {player_name}!");
+				replyOptions.push_back("¡Habla {player_name}, qué cuentas!");
+				replyOptions.push_back("¡Qué bueno verte, {player_name}!");
+				replyOptions.push_back("¿Vienes en son de paz, {player_name}?");
+			}
+			else if (keywordCategory == 2) {
+				replyOptions.clear();
+				replyOptions.push_back("¡Cuídate, {player_name}!");
+				replyOptions.push_back("Nos vemos por Lorencia.");
+				replyOptions.push_back("¡Chao {player_name}, no te mueras!");
+				replyOptions.push_back("Hasta la próxima batalla.");
+				replyOptions.push_back("Ya se va... clásico.");
+				replyOptions.push_back("¡Suerte en el respawn!");
+				replyOptions.push_back("Que el drop te acompañe, {player_name}.");
+				replyOptions.push_back("Buen viaje, {player_name}.");
+				replyOptions.push_back("Adiós... por ahora.");
+				replyOptions.push_back("No olvides resetear antes de salir.");
+			}
+			else if (keywordCategory == 3) {
+				replyOptions.clear();
+				replyOptions.push_back("Todo tranqui, {player_name}.");
+				replyOptions.push_back("Aquí farmeando nomás.");
+				replyOptions.push_back("Jajaja, qué fue contigo.");
+				replyOptions.push_back("¿Primo? ¡Acá estoy, causa!");
+				replyOptions.push_back("¿En qué estoy? Matando bichos.");
+				replyOptions.push_back("Tranqui en Devias, tú sabes.");
+				replyOptions.push_back("¡Habla causa, reportándome!");
+				replyOptions.push_back("Full leveleo, como siempre.");
+				replyOptions.push_back("Metiéndole duro al reset.");
+				replyOptions.push_back("Nada nuevo, sobreviviendo.");
+			}
+			else {
+				replyOptions.clear();
+				replyOptions.push_back("¿Qué dijiste, {player_name}?");
+				replyOptions.push_back("Estoy de acuerdo contigo, {player_name}.");
+				replyOptions.push_back("Interesante lo que dices, {player_name}.");
+				replyOptions.push_back("Jajaja, buena esa, {player_name}.");
+				replyOptions.push_back("Tienes razón, {player_name}.");
+				replyOptions.push_back("Eso me hizo reír, {player_name}.");
+				replyOptions.push_back("Así es la vida en MU, ¿no {player_name}?");
+				replyOptions.push_back("¡Qué buena frase, {player_name}!");
+				replyOptions.push_back("No lo había pensado así, {player_name}.");
+				replyOptions.push_back("¡Totalmente cierto, {player_name}!");
+				replyOptions.push_back("Apoyo esa emoción, {player_name}.");
+				replyOptions.push_back("Sabes mucho de MU, {player_name}.");
+				replyOptions.push_back("Ja, justo pensaba lo mismo, {player_name}.");
+				replyOptions.push_back("Cuidado con lo que dices, {player_name}...");
+				replyOptions.push_back("Eso sonó profundo, {player_name}.");
+				replyOptions.push_back("¡Así se habla, {player_name}!");
+				replyOptions.push_back("Buena observación, {player_name}.");
+				replyOptions.push_back("No esperaba oír eso de ti, {player_name}.");
+				replyOptions.push_back("¿Tú también lo notaste, {player_name}?");
+				replyOptions.push_back("¡Sabías palabras, {player_name}!");
+			}
 
 			std::string reply = replyOptions[rand() % replyOptions.size()];
 			size_t pos = reply.find("{player_name}");
@@ -2122,6 +2205,7 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 		}
 	}
 }
+
 
 
 #endif // USE_FAKE_ONLINE == TRUE
