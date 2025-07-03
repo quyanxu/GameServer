@@ -96,6 +96,7 @@ private:
 };
    
 // Funciones globales y variables externas
+void LoadBotKeywordResponses(const char* filename);
 void LoadBotPhrasesFromFile(const char* filename); 
 std::string GetRandomBotPhrase(int currentMap, bool realPlayerNearby, bool inParty, bool inActivePVPCombat); 
 

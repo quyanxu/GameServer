@@ -30,7 +30,7 @@ extern int Conectar;
 #define GAMESERVER_CLIENT "REAL GAMING"
 #endif
 
-#define UPDATE_GAMING 6
+#define UPDATE_GAMING 7
 #define GAMESERVER_CLIENTE_UPDATE 17
 #define GAMESERVER_CLIENTE_PREMIUM 0
 

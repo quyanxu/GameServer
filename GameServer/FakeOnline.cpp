@@ -55,6 +55,8 @@ std::vector<std::string> g_BotPhrasesPVP;
 std::vector<std::string> g_BotPhrasesMorning;
 std::vector<std::string> g_BotPhrasesAfternoon;
 std::vector<std::string> g_BotPhrasesNight;
+std::map<std::string, std::vector<std::string>> g_KeywordTriggers;
+std::map<std::string, std::vector<std::string>> g_KeywordResponses;
 std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific; 
 std::map<int, std::vector<std::string>> g_BotPhrasesClassSpecific;
 int g_ProbGeneral = 10, g_ProbNearRealPlayer = 15, g_ProbInParty = 12, g_ProbPVP = 20, g_ProbMorning = 20, g_ProbAfternoon = 20, g_ProbNight = 20, g_ProbMapSpecificBase = 10, g_ProbClassSpecificBase = 11;
@@ -154,7 +156,8 @@ void CFakeOnline::LoadFakeData(char* path)
     this->m_Data.clear(); 
     this->m_botPVPCombatStates.clear(); 
     this->IndexMsgMax = 0; this->IndexMsgMin = 0;
-    LoadBotPhrasesFromFile(".\\BotPhrases.txt"); 
+    LoadBotPhrasesFromFile(".\\BotPhrases.txt");
+	LoadBotKeywordResponses(".\\Answering.txt");
     if (!path) { LeaveCriticalSection(&this->m_BotDataMutex); return; }
     pugi::xml_document file;
     if (file.load_file(path).status != pugi::status_ok){ ErrorMessageBox("XML Load Fail: %s", path); LeaveCriticalSection(&this->m_BotDataMutex); return; }
@@ -2055,6 +2058,55 @@ void CFakeOnline::GuiYCParty(int aIndex, int bIndex)
 }
 
 
+
+void LoadBotKeywordResponses(const char* filename)
+{
+	g_KeywordTriggers.clear();
+	g_KeywordResponses.clear();
+
+	std::ifstream file(filename);
+	if (!file.is_open()) return;
+
+	std::string line;
+	std::string currentCategory = "";
+	bool readingResponses = false;
+
+	while (std::getline(file, line))
+	{
+		// Limpieza de espacios
+		line.erase(0, line.find_first_not_of(" \t\r\n"));
+		line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
+		if (line.empty() || line[0] == ';')
+			continue;
+
+		if (line[0] == '#')
+		{
+			currentCategory = line.substr(1); // sin #
+			readingResponses = false;
+			continue;
+		}
+
+		if (line == ">>>")
+		{
+			readingResponses = true;
+			continue;
+		}
+
+		if (currentCategory.empty())
+			continue;
+
+		if (!readingResponses)
+			g_KeywordTriggers[currentCategory].push_back(line);
+		else
+			g_KeywordResponses[currentCategory].push_back(line);
+	}
+
+	file.close();
+}
+
+
+
 void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 {
 	if (!lpSender || !message || strlen(message) == 0)
@@ -2063,48 +2115,24 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 	std::string msgLower = message;
 	std::transform(msgLower.begin(), msgLower.end(), msgLower.begin(), ::tolower);
 
-	std::vector<std::string> saludos;
-	saludos.push_back("hola");
-	saludos.push_back("hello");
-	saludos.push_back("ola");
-	saludos.push_back("habla");
+	std::string matchedCategory;
 
-	std::vector<std::string> despedidas;
-	despedidas.push_back("adios");
-	despedidas.push_back("chao");
-	despedidas.push_back("me quito");
-	despedidas.push_back("hasta luego");
-	despedidas.push_back("hablamos");
+	for (std::map<std::string, std::vector<std::string>>::iterator it = g_KeywordTriggers.begin(); it != g_KeywordTriggers.end(); ++it)
+	{
+		const std::string& category = it->first;
+		std::vector<std::string>& keywords = it->second;
 
-	std::vector<std::string> callejeras;
-	callejeras.push_back("como estas");
-	callejeras.push_back("qué fue primo");
-	callejeras.push_back("en que estas");
-	callejeras.push_back("habla causa");
+		for (size_t k = 0; k < keywords.size(); ++k)
+		{
+			if (msgLower.find(keywords[k]) != std::string::npos)
+			{
+				matchedCategory = category;
+				break;
+			}
+		}
 
-	int keywordCategory = 0;
-
-	for (size_t j = 0; j < saludos.size(); ++j) {
-		if (msgLower.find(saludos[j]) != std::string::npos) {
-			keywordCategory = 1;
+		if (!matchedCategory.empty())
 			break;
-		}
-	}
-	if (keywordCategory == 0) {
-		for (size_t j = 0; j < despedidas.size(); ++j) {
-			if (msgLower.find(despedidas[j]) != std::string::npos) {
-				keywordCategory = 2;
-				break;
-			}
-		}
-	}
-	if (keywordCategory == 0) {
-		for (size_t j = 0; j < callejeras.size(); ++j) {
-			if (msgLower.find(callejeras[j]) != std::string::npos) {
-				keywordCategory = 3;
-				break;
-			}
-		}
 	}
 
 	for (int i = 0; i < MAX_OBJECT; ++i)
@@ -2121,68 +2149,16 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 
 			std::vector<std::string> replyOptions;
 
-			if (keywordCategory == 1) {
-				replyOptions.clear();
-				replyOptions.push_back("¡Hola, {player_name}!");
-				replyOptions.push_back("¿Qué tal, {player_name}?");
-				replyOptions.push_back("¡Buenos días, {player_name}!");
-				replyOptions.push_back("¡Al fin alguien saluda!");
-				replyOptions.push_back("Hey hey, {player_name}!");
-				replyOptions.push_back("¡Saludos desde Lorencia!");
-				replyOptions.push_back("Te estaba esperando, {player_name}!");
-				replyOptions.push_back("¡Habla {player_name}, qué cuentas!");
-				replyOptions.push_back("¡Qué bueno verte, {player_name}!");
-				replyOptions.push_back("¿Vienes en son de paz, {player_name}?");
+			if (!matchedCategory.empty())
+			{
+				replyOptions = g_KeywordResponses[matchedCategory];
 			}
-			else if (keywordCategory == 2) {
-				replyOptions.clear();
-				replyOptions.push_back("¡Cuídate, {player_name}!");
-				replyOptions.push_back("Nos vemos por Lorencia.");
-				replyOptions.push_back("¡Chao {player_name}, no te mueras!");
-				replyOptions.push_back("Hasta la próxima batalla.");
-				replyOptions.push_back("Ya se va... clásico.");
-				replyOptions.push_back("¡Suerte en el respawn!");
-				replyOptions.push_back("Que el drop te acompañe, {player_name}.");
-				replyOptions.push_back("Buen viaje, {player_name}.");
-				replyOptions.push_back("Adiós... por ahora.");
-				replyOptions.push_back("No olvides resetear antes de salir.");
+			else
+			{
+				replyOptions = g_KeywordResponses["GENERAL"];
 			}
-			else if (keywordCategory == 3) {
-				replyOptions.clear();
-				replyOptions.push_back("Todo tranqui, {player_name}.");
-				replyOptions.push_back("Aquí farmeando nomás.");
-				replyOptions.push_back("Jajaja, qué fue contigo.");
-				replyOptions.push_back("¿Primo? ¡Acá estoy, causa!");
-				replyOptions.push_back("¿En qué estoy? Matando bichos.");
-				replyOptions.push_back("Tranqui en Devias, tú sabes.");
-				replyOptions.push_back("¡Habla causa, reportándome!");
-				replyOptions.push_back("Full leveleo, como siempre.");
-				replyOptions.push_back("Metiéndole duro al reset.");
-				replyOptions.push_back("Nada nuevo, sobreviviendo.");
-			}
-			else {
-				replyOptions.clear();
-				replyOptions.push_back("¿Qué dijiste, {player_name}?");
-				replyOptions.push_back("Estoy de acuerdo contigo, {player_name}.");
-				replyOptions.push_back("Interesante lo que dices, {player_name}.");
-				replyOptions.push_back("Jajaja, buena esa, {player_name}.");
-				replyOptions.push_back("Tienes razón, {player_name}.");
-				replyOptions.push_back("Eso me hizo reír, {player_name}.");
-				replyOptions.push_back("Así es la vida en MU, ¿no {player_name}?");
-				replyOptions.push_back("¡Qué buena frase, {player_name}!");
-				replyOptions.push_back("No lo había pensado así, {player_name}.");
-				replyOptions.push_back("¡Totalmente cierto, {player_name}!");
-				replyOptions.push_back("Apoyo esa emoción, {player_name}.");
-				replyOptions.push_back("Sabes mucho de MU, {player_name}.");
-				replyOptions.push_back("Ja, justo pensaba lo mismo, {player_name}.");
-				replyOptions.push_back("Cuidado con lo que dices, {player_name}...");
-				replyOptions.push_back("Eso sonó profundo, {player_name}.");
-				replyOptions.push_back("¡Así se habla, {player_name}!");
-				replyOptions.push_back("Buena observación, {player_name}.");
-				replyOptions.push_back("No esperaba oír eso de ti, {player_name}.");
-				replyOptions.push_back("¿Tú también lo notaste, {player_name}?");
-				replyOptions.push_back("¡Sabías palabras, {player_name}!");
-			}
+
+			if (replyOptions.empty()) continue;
 
 			std::string reply = replyOptions[rand() % replyOptions.size()];
 			size_t pos = reply.find("{player_name}");
