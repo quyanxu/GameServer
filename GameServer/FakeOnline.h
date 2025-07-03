@@ -28,6 +28,8 @@ struct OFFEXP_DATA
 	int PVPMode; 
 	int PartyMode;
 	int MoveRange;
+	int MainAttackSkillID;
+	int SecondaryAttackSkillID;
 
 };
 

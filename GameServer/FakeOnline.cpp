@@ -170,7 +170,7 @@ void CFakeOnline::LoadFakeData(char* path)
             strncpy_s(info.Account, rInfoData.attribute("Account").as_string(""), _TRUNCATE);
             strncpy_s(info.Password, rInfoData.attribute("Password").as_string(""), _TRUNCATE);
             strncpy_s(info.Name, rInfoData.attribute("Name").as_string(""), _TRUNCATE);
-            info.SkillID = rInfoData.attribute("SkillID").as_int(0); info.PVPMode = rInfoData.attribute("PVPMode").as_int(0); 
+			info.MainAttackSkillID = rInfoData.attribute("SkillID").as_int(0); info.SecondaryAttackSkillID = rInfoData.attribute("SecondarySkillID").as_int(0); info.PVPMode = rInfoData.attribute("PVPMode").as_int(0);
             info.UseBuffs[0] = rInfoData.attribute("UseBuffs_0").as_int(0); info.UseBuffs[1] = rInfoData.attribute("UseBuffs_1").as_int(0); info.UseBuffs[2] = rInfoData.attribute("UseBuffs_2").as_int(0);
             info.GateNumber = rInfoData.attribute("GateNumber").as_int(0); info.MapX = rInfoData.attribute("MapX").as_int(125); info.MapY = rInfoData.attribute("MapY").as_int(125);
             info.PhamViTrain = rInfoData.attribute("PhamViTrain").as_int(0); info.MoveRange = rInfoData.attribute("MoveRange").as_int(0); info.TimeReturn = rInfoData.attribute("TimeReturn").as_int(0);
@@ -1688,9 +1688,27 @@ void CFakeOnline::TuDongDanhSkill(int aIndex)
 	int distance = (lpObj->HuntingRange > 6) ? 6 : lpObj->HuntingRange; 
 
 	CSkill* SkillRender;
-	SkillRender = (lpObj->Life < ((lpObj->MaxLife * lpObj->RecoveryDrainPercent) / 100) && lpObj->RecoveryDrainOn != 0) 
-	              ? gSkillManager.GetSkill(lpObj, SKILL_DRAIN_LIFE) 
-	              : gSkillManager.GetSkill(lpObj, lpObj->SkillBasicID); 
+	// Selección de skill según estado de vida (curación o ataque)
+
+
+	if (lpObj->Class == CLASS_SUMMONER &&
+		lpObj->Life < ((lpObj->MaxLife * lpObj->RecoveryDrainPercent) / 100) &&
+		lpObj->RecoveryDrainOn != 0)
+	{
+		SkillRender = gSkillManager.GetSkill(lpObj, SKILL_DRAIN_LIFE);
+	}
+	else
+	{
+		OFFEXP_DATA* pBotData = this->GetOffExpInfo(lpObj);
+		WORD selectedSkillID = pBotData ? pBotData->MainAttackSkillID : lpObj->SkillBasicID;
+
+		if (pBotData && pBotData->SecondaryAttackSkillID > 0 && (rand() % 100) < 50) {
+			selectedSkillID = pBotData->SecondaryAttackSkillID;
+		}
+
+		SkillRender = gSkillManager.GetSkill(lpObj, selectedSkillID);
+	}
+
 
 	if (SkillRender == 0) {
         LeaveCriticalSection(&this->m_BotDataMutex);
