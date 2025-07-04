@@ -1,3 +1,5 @@
+![MU ALFA](https://i.imgur.com/EnTJawW.jpeg)
+
 # 💎 MU ALFA Season 6 — GameServer (Custom Edition)
 
 Bienvenido al repositorio oficial del **GameServer** de [MU ALFA Season 6](https://github.com/creadormu) — un proyecto que renueva por completo la experiencia del MU clásico con **bots inteligentes**, funciones personalizadas y mejoras de calidad para servidores modernos.
