@@ -19,7 +19,7 @@ Bienvenido al repositorio oficial del **GameServer** de [MU ALFA Season 6](https
 - Sistema de respuestas por palabras clave y categorías dinámicas.
 
 ✅ **Season 6 optimizado**  
-- Basado en MU 99B + Season 6 con mejoras.  
+- Basado en MU EMU + Season 6 con mejoras.  
 - Múltiples fixes de estabilidad y rendimiento en el GameServer.  
 - Soporte para extensiones modernas de cliente y sistema de seguridad opcional.
 
@@ -31,6 +31,7 @@ Bienvenido al repositorio oficial del **GameServer** de [MU ALFA Season 6](https
 ---
 
 ## 📁 Estructura del repositorio
+
 GameServer/
 ├── FakeOnline.cpp/.h ← Lógica central de bots con IA
 ├── BotPhrases.txt ← Frases de bots por situación
@@ -77,8 +78,7 @@ Este GameServer forma parte del ecosistema completo de **MU ALFA**, que incluye:
 ## 🌐 Comunidad
 
 💬 Comparte, colabora y evoluciona con nosotros:  
-📌 Foro: [RageZone](https://ragezone.com)  
-📌 Discord: [Enlace próximamente]
+📌 Discord: https://discord.gg/UY2Nhks4Cw
 
 ---
 
