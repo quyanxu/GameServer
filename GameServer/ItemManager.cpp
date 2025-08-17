@@ -55,6 +55,34 @@ ITEM_ATTRIBUTE ItemAttribute[MAX_ITEM]; //MC bot
 
 int g_MaxItemIndexOfEachItemType[MAX_ITEM_TYPE]; //MC bot
 
+int CItemManager::GetItemWidth(int itemType)
+{
+	// Assuming itemType is the index of the item
+	CItem item;
+	item.Convert(itemType, 0, 0, 0, 0, 0, 0, 0, nullptr, 0);
+
+	int width = 0, height = 0;
+	item.GetSize(width, height); // Use the existing GetSize method from CItem
+	return width;
+}
+
+int CItemManager::GetItemHeight(int itemType)
+{
+	// Example logic: Determine item height based on its type
+	// You may need to adjust this logic based on your game's item data structure
+	switch (itemType)
+	{
+	case GET_ITEM(14, 15): // Example: Zen
+		return 1;
+	case GET_ITEM(14, 13): // Example: Jewel of Bless
+		return 1;
+	case GET_ITEM(14, 14): // Example: Jewel of Soul
+		return 1;
+	default:
+		return 2; // Default height for other items
+	}
+}
+
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////

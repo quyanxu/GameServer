@@ -99,6 +99,7 @@ private:
 	LOG_DISPLAY_INFO m_log[MAX_LOG_TEXT_LINE];
 	LOGCONNECT_DISPLAY_INFO m_logConnect[MAX_LOGCONNECT_TEXT_LINE];
 	LOGGLOBAL_DISPLAY_INFO m_logGlobal[MAX_LOGGLOBAL_TEXT_LINE];
+	HBITMAP m_hTopBarBitmap;
 	int m_count;
 	int m_countConnect;
 	int m_countGlobal;

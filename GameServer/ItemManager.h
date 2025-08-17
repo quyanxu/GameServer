@@ -404,6 +404,8 @@ public:
 	void CGMoveItemProc(PMSG_MOVEITEM* aRecv, short aIndex);
 	bool CheckItemRequireClassUnick(WORD Class,int index); // OK
 	bool CheckItemNotSlot(int index); // OK
+	int GetItemWidth(int itemType); // Declaration of the new method
+	int GetItemHeight(int itemType);
 
  #if(SOIITEM)
 	void GCItemListViewSend(PMSG_VIEW_REQUEST_RECV* lpMsg,int aIndex);

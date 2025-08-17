@@ -628,6 +628,31 @@ LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) // 
 		case WM_DATA_SERVER_MSG_PROC:
 			DataServerMsgProc(wParam,lParam);
 			break;
+		//case WM_PAINT:
+		////{
+		////	PAINTSTRUCT ps;
+		////	HDC hdc = BeginPaint(hWnd, &ps);
+		////
+		////	HBITMAP hBitmap = LoadBitmap(GetModuleHandle(NULL), MAKEINTRESOURCE(IDB_BITMAP1));
+		////	if (hBitmap)
+		////	{
+		////		HDC hMemDC = CreateCompatibleDC(hdc);
+		////		SelectObject(hMemDC, hBitmap);
+		////
+		////		BITMAP bmp;
+		////		GetObject(hBitmap, sizeof(BITMAP), &bmp);
+		////
+		////		// Pinta el TopBar en la esquina superior izquierda
+		////		//BitBlt(hdc, 0, 0, bmp.bmWidth, bmp.bmHeight, hMemDC, 0, 0, SRCCOPY);
+		////
+		////		DeleteDC(hMemDC);
+		////		DeleteObject(hBitmap);
+		////	}
+		////
+			//EndPaint(hWnd, &ps);
+		//}
+		return 0;
+		break;
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			break;

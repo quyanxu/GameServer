@@ -1,3 +1,7 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "stdafx.h" 
 #include "FakeOnline.h"
 #include "ItemManager.h"
@@ -40,7 +44,18 @@
 #include "pugixml.hpp" 
 #include <cstdlib> // For rand()
 #include <ctime>   // For seeding random numbers
+#include "Trade.h"
+#include "BotTrader.h"
 
+// Function to trim leading and trailing whitespace from a string
+std::string trim(const std::string& str) {
+	size_t first = str.find_first_not_of(" \t\n\r");
+	if (first == std::string::npos) {
+		return ""; // String is all whitespace
+	}
+	size_t last = str.find_last_not_of(" \t\n\r");
+	return str.substr(first, (last - first + 1));
+}
 
 #if USE_FAKE_ONLINE == TRUE // INICIO DEL BLOQUE CONDICIONAL
 
@@ -158,6 +173,7 @@ void CFakeOnline::LoadFakeData(char* path)
     this->IndexMsgMax = 0; this->IndexMsgMin = 0;
     LoadBotPhrasesFromFile(".\\BotPhrases.txt");
 	LoadBotKeywordResponses(".\\Answering.txt");
+	this->LoadFakeBotTradeConfig(".\\FakeBotTrade.txt");
     if (!path) { LeaveCriticalSection(&this->m_BotDataMutex); return; }
     pugi::xml_document file;
     if (file.load_file(path).status != pugi::status_ok){ ErrorMessageBox("XML Load Fail: %s", path); LeaveCriticalSection(&this->m_BotDataMutex); return; }
@@ -557,7 +573,7 @@ void CFakeOnline::RestoreFakeOnline()
             lpObj->IsFakeOnline = 1; lpObj->AttackCustom = 0; lpObj->m_OfflineMode = 0; 
             lpObj->AttackCustomDelay = GetTickCount(); 
             lpObj->FakeBotPartyInviteCooldownTick = 0; 
-            lpObj->IsFakeTimeLag = 0; lpObj->m_OfflineMoveDelay = 0; 
+            lpObj->IsFakeTimeLag = 0; lpObj->IsFakeOnlineBot = true; lpObj->m_OfflineMoveDelay = 0;
             lpObj->IsFakePVPMode = it->second.PVPMode; 
             gObjectManager.CharacterCalcAttribute(aIndex); 
             LogAdd(LOG_RED, "[FakeOnline]  [TK: %s NV: %s][Cls:%d] Da Online Vao Server. PVPMode:%d. PhysiSpeed:%d. DBClass:%d", 
@@ -585,6 +601,7 @@ void CFakeOnline::RestoreFakeOnline()
 
 			gObjViewportListCreate(lpObj->Index);
 			gObjViewportListProtocolCreate(lpObj);
+
 
 			LogAdd(LOG_RED, "[FakeOnline]  [TK: %s NV: %s][Cls:%d] Online at Map:%d X:%d Y:%d Gate:%d", it->second.Account, it->second.Name, lpObj->Class, lpObj->Map, lpObj->X, lpObj->Y, lpObj->GateNumber);
 		}
@@ -1097,7 +1114,9 @@ bool FakeitemListPickUp(int Index, int Level, LPOBJ lpObj)
 // Devuelve true si se intentó mover, false si ya está en el objetivo o no se puede mover
 static bool MoveBotOneStepTowards(LPOBJ lpObj, int targetX, int targetY)
 {
-    if (lpObj->X == targetX && lpObj->Y == targetY)
+    
+	
+	if (lpObj->X == targetX && lpObj->Y == targetY)
     {
         return false; // Ya está en el destino
     }
@@ -1700,7 +1719,8 @@ void CFakeOnline::TuDongDanhSkill(int aIndex)
 	else
 	{
 		OFFEXP_DATA* pBotData = this->GetOffExpInfo(lpObj);
-		WORD selectedSkillID = pBotData ? pBotData->MainAttackSkillID : lpObj->SkillBasicID;
+
+		WORD selectedSkillID = static_cast<WORD>(pBotData ? pBotData->MainAttackSkillID : lpObj->SkillBasicID);
 
 		if (pBotData && pBotData->SecondaryAttackSkillID > 0 && (rand() % 100) < 50) {
 			selectedSkillID = pBotData->SecondaryAttackSkillID;
@@ -2200,6 +2220,298 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 	}
 }
 
+bool CFakeOnline::CanTradeWithBot(const LPOBJ lpBot)
+{
+	if (!lpBot || !lpBot->Account[0]) return false;
+	std::string acc = trim(lpBot->Account);
+	std::transform(acc.begin(), acc.end(), acc.begin(), ::toupper);
+	auto it = m_TradeData.find(acc);
+	if (it != m_TradeData.end()) {
+		LogAdd(LOG_BLUE, "[FakeBot][CanTradeWithBot] Bot %s (Account: %s) SÍ está en la lista de trade.", lpBot->Name, lpBot->Account);
+		return true;
+	}
+	LogAdd(LOG_RED, "[FakeBot][CanTradeWithBot] Bot %s (Account: %s) NO está en la lista de trade.", lpBot->Name, lpBot->Account);
+	return false;
+}
 
+bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
+	LogAdd(LOG_RED, "[FakeBotTrade] Se intentó trade con %s por %s", lpBot->Name, gObj[playerIndex].Name);
+
+	// FIX 1: Proper account key handling
+	std::string acc = trim(lpBot->Account);
+	std::transform(acc.begin(), acc.end(), acc.begin(), ::toupper);
+
+	auto it = m_TradeData.find(acc);
+	if (it == m_TradeData.end()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No deseo hacer trade.");
+		return false;
+	}
+
+	const auto& config = it->second;
+	if (config.requiredItems.empty()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No hay requerimientos configurados.");
+		return false;
+	}
+
+	// Validar cantidad de ítems
+	int itemCount = CountTradeItems(playerIndex);
+	if (itemCount != config.requiredItems.size()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Debes poner %d items requeridos.", config.requiredItems.size());
+		return false;
+	}
+
+	// FIX 2: Proper item validation including type check
+	std::vector<bool> reqFound(config.requiredItems.size(), false);
+
+	for (int n = 0; n < TRADE_SIZE; n++) {
+		CItem* pItem = &(gObj[playerIndex].Trade[n]);
+		if (!pItem->IsItem()) continue;
+
+		for (size_t reqIdx = 0; reqIdx < config.requiredItems.size(); reqIdx++) {
+			if (reqFound[reqIdx]) continue; // Already found this requirement
+
+			const auto& req = config.requiredItems[reqIdx];
+			if (pItem->m_Index == req.Type &&              // Check item type
+				pItem->m_Level >= req.LevelMin &&
+				pItem->m_Option3 >= req.OptionMin &&
+				pItem->m_Option2 >= req.Luck &&
+				pItem->m_Option1 >= req.Skill &&
+				pItem->m_NewOption >= req.Exc &&
+				pItem->m_Durability >= req.Dur) {
+				reqFound[reqIdx] = true;
+				break;
+			}
+		}
+	}
+
+	// Check if all requirements are met
+	for (size_t i = 0; i < reqFound.size(); i++) {
+		if (!reqFound[i]) {
+			gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Los items no cumplen con los requisitos.");
+			return false;
+		}
+	}
+
+	// FIX 3: Better inventory space check
+	if (config.rewardItems.empty()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No hay recompensas configuradas.");
+		return false;
+	}
+
+	// Check space for reward items
+	for (size_t i = 0; i < config.rewardItems.size(); ++i) {
+		const auto& reward = config.rewardItems[i];
+		if (gItemManager.CheckItemInventorySpace(&gObj[playerIndex],
+			gItemManager.GetItemWidth(reward.Type),
+			gItemManager.GetItemHeight(reward.Type)) == 0) {
+			gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No tienes espacio en inventario.");
+			return false;
+		}
+	}
+
+	// FIX 4: Success rate check
+	if (config.successRate < 100) {
+		int random = rand() % 100;
+		if (random >= config.successRate) {
+			gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "El trade falló por suerte.");
+			return false;
+		}
+	}
+
+	// FIX 5: Give all reward items, not just first one
+	for (std::vector<MixesItems>::const_iterator it = config.rewardItems.begin(); it != config.rewardItems.end(); ++it) {
+		const MixesItems& reward = *it;
+
+		GDCreateItemSend(playerIndex, 235, 0, 0, reward.Type, reward.LevelMin, 0,
+			reward.Skill, reward.Luck, reward.OptionMin, -1, reward.Exc, 0, 0, 0, 0, 0xFE, 0);
+	}
+
+	// FIX 6: Proper trade completion
+	gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Trade completado con éxito.");
+
+	// Clear trade items and close trade window
+	//for (int i = 0; i < TRADE_SIZE; i++) {
+	//	gObj[playerIndex].Trade[i].Clear();
+	//}
+
+	// Close trade interface
+	//gTrade.GCTradeResultSend(playerIndex, 1); // 1 = success
+
+	return true;
+}
+
+
+void CFakeOnline::LoadFakeBotTradeConfig(const char* path) {
+	LogAdd(LOG_BLUE, "[FakeBotTrade] Intentando cargar archivo: %s", path);
+
+	FILE* file = fopen(path, "r");
+	if (!file) {
+		LogAdd(LOG_RED, "[FakeBotTrade] ERROR: No se pudo abrir el archivo %s", path);
+		return;
+	}
+
+	int section = 0;
+	char line[256];
+	int botsCargados = 0, itemsReq = 0, rewards = 0;
+	std::vector<std::string> botAccounts; // Store bot accounts in order
+
+	auto clean_upper = [](const char* input) -> std::string {
+		std::string s = input ? input : "";
+		size_t start = s.find_first_not_of(" \t\r\n");
+		size_t end = s.find_last_not_of(" \t\r\n");
+		s = (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+		std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+		return s;
+		};
+
+	while (fgets(line, sizeof(line), file)) {
+		line[strcspn(line, "\r\n")] = 0;
+		if (line[0] == '/' || line[0] == 0) continue;
+
+		if (strncmp(line, "end", 3) == 0) {
+			section++;
+			continue;
+		}
+
+		// SECTION 0: Bots
+		if (section == 0) {
+			char* token = strtok(line, " \t");
+			if (!token) continue;
+			int index = atoi(token);
+
+			token = strtok(NULL, " \t");
+			if (!token) continue;
+			char acc[32] = { 0 };
+			strncpy(acc, token, sizeof(acc) - 1);
+
+			token = strtok(NULL, " \t");
+			if (!token) continue;
+			char tradeName[32] = { 0 };
+			strncpy(tradeName, token, sizeof(tradeName) - 1);
+
+			token = strtok(NULL, " \t");
+			if (!token) continue;
+			int rate = atoi(token);
+
+			std::string accKey = clean_upper(acc);
+			FAKEBOT_TRADE_ITEM& trade = m_TradeData[accKey];
+			trade.tradeName = tradeName;
+			trade.successRate = rate;
+
+			botAccounts.push_back(accKey); // Store in order
+			botsCargados++;
+		}
+		// SECTION 1: Requirements - use ordered bot accounts
+		else if (section == 1) {
+			char* token = strtok(line, " \t");
+			if (!token) continue;
+			int botIndex = atoi(token);
+
+			if (botIndex < 0 || botIndex >= botAccounts.size()) continue;
+
+			int type, index, lvl, opt, luck, skill, exc, dur;
+			token = strtok(NULL, " \t"); if (!token) continue; type = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; index = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; lvl = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; opt = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; luck = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; skill = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; exc = atoi(token);
+			token = strtok(NULL, " \t"); if (!token) continue; dur = atoi(token);
+
+			MixesItems item;
+			item.Type = GET_ITEM(type, index);
+			item.LevelMin = (BYTE)lvl;
+			item.LevelMax = (BYTE)lvl;
+			item.OptionMin = (BYTE)opt;
+			item.OptionMax = (BYTE)opt;
+			item.Luck = (BYTE)luck;
+			item.Skill = (BYTE)skill;
+			item.Exc = (BYTE)exc;
+			item.Dur = (BYTE)dur;
+
+			// Use ordered account access
+			std::string accKey = botAccounts[botIndex];
+			m_TradeData[accKey].requiredItems.push_back(item);
+			itemsReq++;
+		}
+		// SECTION 2: Rewards (unchanged)
+		else if (section == 2) {
+			char* token = strtok(line, " \t");
+			if (!token) continue;
+			char tradeName[32] = { 0 };
+			strncpy(tradeName, token, sizeof(tradeName) - 1);
+
+			int data[10] = { 0 };
+			for (int i = 0; i < 10; ++i) {
+				token = strtok(NULL, " \t");
+				if (!token) break;
+				data[i] = atoi(token);
+			}
+			if (token == NULL) continue;
+
+			MixesItems reward;
+			reward.Type = GET_ITEM(data[0], data[1]);
+			reward.LevelMin = (BYTE)data[2];
+			reward.LevelMax = (BYTE)data[3];
+			reward.OptionMin = (BYTE)data[4];
+			reward.OptionMax = (BYTE)data[5];
+			reward.Luck = (BYTE)data[6];
+			reward.Skill = (BYTE)data[7];
+			reward.Exc = (BYTE)data[8];
+			reward.Dur = (BYTE)data[9];
+
+			for (auto it = m_TradeData.begin(); it != m_TradeData.end(); ++it) {
+				if (strcmp(it->second.tradeName.c_str(), tradeName) == 0) {
+					it->second.rewardItems.push_back(reward);
+					rewards++;
+				}
+			}
+		}
+	}
+
+	fclose(file);
+	LogAdd(LOG_GREEN, "[FakeBotTrade] Carga completa: Bots: %d | Items requeridos: %d | Recompensas: %d", botsCargados, itemsReq, rewards);
+}
+
+bool CFakeOnline::CanStartTradeWithBot(int playerIndex, LPOBJ lpBot) {
+	if (!lpBot || !CanTradeWithBot(lpBot)) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "FakeBot: Este bot no puede hacer trade.");
+		return false;
+	}
+
+	if (gObj[playerIndex].Interface.use != 0) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "FakeBot: Ya estás en una ventana.");
+		return false;
+	}
+
+	return true;
+}
+
+
+int CFakeOnline::CountTradeItems(int aIndex) {
+	int count = 0;
+	for (int i = 0; i < TRADE_SIZE; ++i) {
+		if (gObj[aIndex].Trade[i].IsItem() == TRUE) {
+			count++;
+		}
+	}
+	return count;
+}
+
+bool CFakeOnline::IsUniqueItemType(std::vector<MixesItems>& needList, int currentIndex) {
+	if (currentIndex == 0) return true;
+	for (int i = 0; i < currentIndex; ++i) {
+		if (needList[i].Type == needList[currentIndex].Type) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void CFakeOnline::TradeCancel(int aIndex) {
+	gTrade.ResetTrade(aIndex);
+	gTrade.GCTradeResultSend(aIndex, 0);
+}
 
 #endif // USE_FAKE_ONLINE == TRUE

@@ -4,7 +4,8 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <map> 
+#include <map>
+#include "BotTrader.h"
 
 #if USE_FAKE_ONLINE == TRUE
 
@@ -33,6 +34,15 @@ struct OFFEXP_DATA
 
 };
 
+
+struct FAKEBOT_TRADE_ITEM {
+	std::string tradeName;
+	int successRate;
+	std::vector<MixesItems> requiredItems;
+	std::vector<MixesItems> rewardItems;
+};
+
+
 struct BotActivePVPCombatState
 {
 	bool isInActiveCombat;
@@ -55,6 +65,7 @@ public:
 	OFFEXP_DATA* GetOffExpInfoByAccount(LPOBJ lpObj);
 	void LoadFakeData(char* path);
 	void CheckAutoReset(LPOBJ lpObj); // Add this declaration
+	bool CanTradeWithBot(const LPOBJ lpBot);
 	void FakeAttackProc(LPOBJ lpObj);
 	void DarkWizardFakeAttack(LPOBJ lpObj);
 	void DKFakeAttack(LPOBJ lpObj);
@@ -81,8 +92,17 @@ public:
 	void SendRFSkillAttack(LPOBJ lpObj, int aIndex, int SkillNumber);
 	void GuiYCParty(int aIndex, int bIndex);
 	void ChatRecv(LPOBJ lpSender, const char* message);
+	void LoadFakeBotTradeConfig(const char* path);
+	bool CanStartTradeWithBot(int playerIndex, LPOBJ lpBot);
+	bool HandleFakeBotTrade(int playerIndex, LPOBJ lpBot);
+	void TradeCancel(int aIndex);
+	int CountTradeItems(int aIndex);
+	bool IsUniqueItemType(std::vector<MixesItems>& needList, int currentIndex);
+
+
 	
 public:
+	std::map<std::string, FAKEBOT_TRADE_ITEM> m_TradeData;
 	std::map<std::string, OFFEXP_DATA> m_Data;
 	int AccountsRestored;
 	DWORD TimeFakeLogIn;

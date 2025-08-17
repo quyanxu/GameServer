@@ -686,6 +686,7 @@ struct OBJECTSTRUCT
 	int MoveRangeStartY; // Add this member if needed for consistency
 	int MoveRangeEndX;   // Add this member if needed for consistency
 	int MoveRangeEndY;   // Add this member if needed for consistency
+	bool IsFakeOnlineBot;
 
 	#if(GAMESERVER_UPDATE>=701)
 	int ElementalAttribute;

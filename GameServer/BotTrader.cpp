@@ -14,6 +14,7 @@
 #include "ObjectManager.h"
 #include "MuunSystem.h"
 #include "GensSystem.h"
+#include "FakeOnline.h"
 
 ObjBotTrader BotTrader;
 
@@ -595,70 +596,106 @@ void ObjBotTrader::TradeOk(int aIndex)
 
 BOOL ObjBotTrader::TradeOpen(int index, int nindex)
 {
-	if(gObjIsConnected(index) == 0)
-	{
+	if (gObjIsConnected(index) == 0 || gObjIsConnected(nindex) == 0)
 		return 0;
-	}
-	if(gObjIsConnected(nindex) == 0)
-	{
-		return 0;
-	}
-	int number = this->GetBotIndex(nindex);
-	if(number == -1)
-		return 0;
-	
-	LPOBJ lpObj = &gObj[index];
-	LPOBJ lpBot = &gObj[nindex]; 
 
-	if(this->bot[number].OnlyVip != 0 && lpObj->AccountLevel == 0)
+	LPOBJ lpObj = &gObj[index];
+	LPOBJ lpBot = &gObj[nindex];
+
+	// ================================
+	// SOPORTE PARA FAKEONLINE
+	// ================================
+	if (lpBot->IsFakeOnlineBot)
 	{
-		gNotice.NewNoticeSend(lpObj->Index,0,0,0,0,0,"%s : Im Only work for Account Vips!",this->bot[number].Name);
-		LogAdd(LOG_BOT,"[Warning] Not Open [Bot: %s] Name: %s  AccountLevel Free",this->bot[number].Name,gObj[index].Account);
+		LogAdd(LOG_RED, "[FakeBotTrade] Trade solicitado por %s hacia bot FAKE %s", lpObj->Name, lpBot->Name);
+
+		if (lpObj->Interface.use > 0)
+			return 0;
+
+		for (int n = 0; n < TRADE_SIZE; n++)
+			lpObj->Trade[n].Clear();
+
+		memset(lpObj->TradeMap, (BYTE)-1, TRADE_SIZE);
+
+		gObjInventoryTransaction(lpObj->Index);
+		gTrade.GCTradeResponseSendBOT(true, lpObj->Index, lpBot->Name, 400, 0);
+		gTrade.GCTradeOkButtonSend(lpObj->Index, 1);
+
+		lpObj->Interface.state = 1;
+		lpObj->Interface.use = 1;
+		lpObj->Interface.type = 1;
+		lpObj->TradeMoney = 0;
+		lpObj->TargetNumber = lpBot->Index;
+		lpObj->Transaction = 1;
+
+		//Congelar también el bot para que no camine o ataque mientras está en trade
+		lpBot->Interface.state = 1;
+		lpBot->Interface.use = 1;
+		lpBot->Interface.type = 1;
+		lpBot->TargetNumber = lpObj->Index;
+		lpBot->Transaction = 1;
+
+		LogAdd(LOG_RED, "[FakeBotTrade] Trade abierto con %s (FAKE)", lpBot->Name);
 		return 1;
 	}
-	if(this->bot[number].ActiveGensFamily == 1)
+
+	// ================================
+	// SOPORTE PARA BOTTRADER.INI (original)
+	// ================================
+	int number = this->GetBotIndex(nindex);
+	if (number == -1)
+		return 0;
+
+	if (this->bot[number].OnlyVip != 0 && lpObj->AccountLevel == 0)
 	{
-		if(this->bot[number].GensFamily != GENS_FAMILY_VARNERT && gObj[index].GensFamily == GENS_FAMILY_NONE )
+		gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "%s : Im Only work for Account Vips!", this->bot[number].Name);
+		LogAdd(LOG_BOT, "[Warning] Not Open [Bot: %s] Name: %s  AccountLevel Free", this->bot[number].Name, gObj[index].Account);
+		return 1;
+	}
+
+	if (this->bot[number].ActiveGensFamily == 1)
+	{
+		if (this->bot[number].GensFamily != GENS_FAMILY_VARNERT && gObj[index].GensFamily == GENS_FAMILY_NONE)
 		{
-			gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s : You Need be GensFamily Vanert",this->bot[number].Name);
+			gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s : You Need be GensFamily Vanert", this->bot[number].Name);
 			return 1;
 		}
 		if (this->bot[number].GensFamily != GENS_FAMILY_DUPRIAN && gObj[index].GensFamily == GENS_FAMILY_NONE)
 		{
-			gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s : You Need be GensFamily Duprian",this->bot[number].Name);
+			gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s : You Need be GensFamily Duprian", this->bot[number].Name);
 			return 1;
 		}
 		if (this->bot[number].GensFamily == GENS_FAMILY_VARNERT && gObj[index].GensFamily == GENS_FAMILY_DUPRIAN)
 		{
-			gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s : You Need be GensFamily Duprian",this->bot[number].Name);
+			gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s : You Need be GensFamily Duprian", this->bot[number].Name);
 			return 1;
 		}
 		if (this->bot[number].GensFamily == GENS_FAMILY_DUPRIAN && gObj[index].GensFamily == GENS_FAMILY_VARNERT)
 		{
-			gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s : You Need be GensFamily Vanert",this->bot[number].Name);
+			gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s : You Need be GensFamily Vanert", this->bot[number].Name);
 			return 1;
 		}
-		if(this->bot[number].ReqContribution > gObj[index].GensContribution)
+		if (this->bot[number].ReqContribution > gObj[index].GensContribution)
 		{
-			gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s : Insuficent GensContribution : %d",this->bot[number].Name,this->bot[number].ReqContribution);
-			LogAdd(LOG_RED,"[%s] Account: %s - Insuficent GensContribution : %d",this->bot[number].Name,gObj[index].Account,this->bot[number].ReqContribution);
+			gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s : Insuficent GensContribution : %d", this->bot[number].Name, this->bot[number].ReqContribution);
+			LogAdd(LOG_RED, "[%s] Account: %s - Insuficent GensContribution : %d", this->bot[number].Name, gObj[index].Account, this->bot[number].ReqContribution);
 			return 1;
 		}
 	}
-	
-	if(this->Enabled == TRUE)
+
+	if (this->Enabled == TRUE)
 	{
-		if ( lpObj->Interface.use > 0 )
+		if (lpObj->Interface.use > 0)
 		{
 			return 0;
 		}
 		else
-		{	
-			for(int n = 0; n < TRADE_SIZE; n++)
+		{
+			for (int n = 0; n < TRADE_SIZE; n++)
 			{
 				lpObj->Trade[n].Clear();
 			}
-			memset(lpObj->TradeMap, (BYTE)-1, TRADE_SIZE );
+			memset(lpObj->TradeMap, (BYTE)-1, TRADE_SIZE);
 
 			gObjInventoryTransaction(lpObj->Index);
 			gTrade.GCTradeResponseSendBOT(true, lpObj->Index, lpBot->Name, 400, 0);
@@ -670,16 +707,16 @@ BOOL ObjBotTrader::TradeOpen(int index, int nindex)
 			lpObj->TargetNumber = lpBot->Index;
 			lpObj->Transaction = 1;
 
-			LogAdd(LOG_BOT,"[BotTrader] (%s)(%s) OPEN",gObj[index].Account,gObj[index].Name);
-			gNotice.NewNoticeSend(lpObj->Index,0,0,0,0,0,"%s : I'm Ready: %s",gObj[nindex].Name,gObj[index].Name);
-			
-			if(this->bot[number].PCPoint > 0)
-			{ 
-				gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s: I Need %d PCPoint!",this->bot[number].Name,this->bot[number].PCPoint);
-			}	
-			if(this->bot[number].Money > 0)
-			{ 
-				gNotice.NewNoticeSend(gObj[index].Index,0,0,0,0,0,"%s: I Need %d Money!",this->bot[number].Name,this->bot[number].Money);
+			LogAdd(LOG_BOT, "[BotTrader] (%s)(%s) OPEN", gObj[index].Account, gObj[index].Name);
+			gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "%s : I'm Ready: %s", gObj[nindex].Name, gObj[index].Name);
+
+			if (this->bot[number].PCPoint > 0)
+			{
+				gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s: I Need %d PCPoint!", this->bot[number].Name, this->bot[number].PCPoint);
+			}
+			if (this->bot[number].Money > 0)
+			{
+				gNotice.NewNoticeSend(gObj[index].Index, 0, 0, 0, 0, 0, "%s: I Need %d Money!", this->bot[number].Name, this->bot[number].Money);
 			}
 		}
 	}

@@ -31,7 +31,7 @@ CServerDisplayer::CServerDisplayer() // OK
 	this->m_font2 = CreateFont(24,0,0,0,FW_THIN,0,0,0,ANSI_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH | FF_DONTCARE,"Times");
 	this->m_font3 = CreateFont(15,0,0,0,FW_THIN,0,0,0,ANSI_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH | FF_DONTCARE,"MS Sans Serif");
 	this->m_font4 = CreateFont(20,0,0,0,FW_THIN,0,0,0,ANSI_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH | FF_DONTCARE,"Times");
-	
+	this->m_hTopBarBitmap = LoadBitmap(GetModuleHandle(NULL), MAKEINTRESOURCE(IDB_BITMAP1));
 	
 #if(GAMESERVER_NOMBRE == 0)
 	this->m_brush[0] = CreateSolidBrush(RGB(105,105,105)); //-- cuando esta activo
@@ -65,6 +65,7 @@ CServerDisplayer::~CServerDisplayer() // OK
 	DeleteObject(this->m_brush[2]);
 	DeleteObject(this->m_brush[3]);
 	DeleteObject(this->m_brush[4]);
+	DeleteObject(this->m_hTopBarBitmap);
 }
 
 void CServerDisplayer::Init(HWND hWnd) // OK
@@ -360,21 +361,20 @@ void CServerDisplayer::PaintName() // OK nombre
 
 	HDC hdc = GetDC(this->m_hwnd);
 
-	int OldBkMode = SetBkMode(hdc,TRANSPARENT);
+	if (this->m_hTopBarBitmap != NULL)
+	{
+		HDC hMemDC = CreateCompatibleDC(hdc);
+		SelectObject(hMemDC, this->m_hTopBarBitmap);
 
-	HFONT OldFont = (HFONT)SelectObject(hdc,this->m_font);
+		BITMAP bmp;
+		GetObject(this->m_hTopBarBitmap, sizeof(BITMAP), &bmp);
 
-	SetTextColor(hdc,RGB(255,255,255));
+		// Pinta la imagen en la parte superior
+		SetStretchBltMode(hdc, HALFTONE); // HALFTONE mejora calidad al escalar
+		StretchBlt(hdc, 0, 0, rect.right, bmp.bmHeight, hMemDC, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY);		DeleteDC(hMemDC);
+	}
 
-	FillRect(hdc,&rect,this->m_brush[2]);
-
-	DrawText(hdc, GAMESERVER_CLIENT, sizeof(GAMESERVER_CLIENT), &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-	SelectObject(hdc,OldFont);
-
-	SetBkMode(hdc,OldBkMode);
-	
-	ReleaseDC(this->m_hwnd,hdc);
+	ReleaseDC(this->m_hwnd, hdc);
 }
 
 void CServerDisplayer::PaintEventTime() // OK

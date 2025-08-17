@@ -792,6 +792,7 @@ void CServerInfo::ReloadBotInfo() // OK
 	BotTrader.Read(gPath.GetFullPath("Custom\\BotSystem\\BotTrader.ini"));
 	BotTrader.MakeBot();
 
+
 	LogAdd(LOG_BOT,"[ReadBotInfo] BotSystem loaded successfully");
 }
 //MC bot

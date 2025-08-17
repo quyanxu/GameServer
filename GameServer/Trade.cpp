@@ -22,6 +22,7 @@
 #include "BotAlchemist.h"
 #include "BotStore.h"
 #include "BotTrader.h"
+#include "FakeOnline.h"
 
 CTrade gTrade;
 //////////////////////////////////////////////////////////////////////
@@ -446,6 +447,109 @@ void CTrade::CGTradeOkButtonRecv(PMSG_TRADE_OK_BUTTON_RECV* lpMsg,int aIndex) //
 	if(lpMsg->flag == 1 && lpObj->TradeOk == 0)
 	{
 		lpObj->TradeOk = 1;
+	}
+
+	// ADD THIS NEW SECTION - FakeBot validation with proper cleanup
+// Check if the target (who we're trading with) is a FakeBot
+	if (lpTarget->IsFakeOnlineBot && lpObj->TradeOk == 1)
+	{
+		// Player is trying to accept trade with FakeBot
+		// Validate the trade requirements
+		if (!s_FakeOnline.HandleFakeBotTrade(aIndex, lpTarget))
+		{
+			// Trade validation failed - cancel the trade properly
+			this->ResetTrade(aIndex);
+			this->GCTradeResultSend(aIndex, 0);
+			return;
+		}
+
+		// IMPORTANT: Trade validation passed - now do FULL cleanup like normal trade
+
+		// Commit inventory changes for the player
+		gObjInventoryCommit(aIndex);
+		gItemManager.GCItemListSend(aIndex);
+#if(GAMESERVER_UPDATE>=802)
+		gEventInventory.GCEventItemListSend(aIndex);
+#endif
+		gObjectManager.CharacterMakePreviewCharSet(aIndex);
+
+		// Save character data
+		GDCharacterInfoSaveSend(aIndex);
+
+		// Clear player's trade
+		this->ClearTrade(lpObj);
+
+		// Reset player's interface state - THIS IS CRITICAL
+		lpObj->Interface.use = 0;
+		lpObj->Interface.type = INTERFACE_NONE;
+		lpObj->Interface.state = 0;
+		lpObj->TargetNumber = -1;
+		lpObj->TradeOk = 0;
+		lpObj->TradeOkTime = 0;
+		lpObj->TradeMoney = 0;
+
+		// Clear bot's trade
+		this->ClearTrade(lpTarget);
+
+		// Reset bot's interface state - THIS IS ALSO CRITICAL
+		lpTarget->Interface.use = 0;
+		lpTarget->Interface.type = INTERFACE_NONE;
+		lpTarget->Interface.state = 0;
+		lpTarget->TargetNumber = -1;
+		lpTarget->TradeOk = 0;
+		lpTarget->TradeOkTime = 0;
+		lpTarget->TradeMoney = 0;
+
+		// Send success message to player
+		this->GCTradeResultSend(aIndex, 1);
+
+		return;
+	}
+
+	// Check if the player (who clicked OK) is a FakeBot  
+	if (lpObj->IsFakeOnlineBot && lpMsg->flag == 1)
+	{
+		// FakeBot is accepting trade - validate requirements
+		if (!s_FakeOnline.HandleFakeBotTrade(bIndex, lpObj))
+		{
+			// Validation failed - proper cleanup
+			this->ResetTrade(bIndex);
+			this->GCTradeResultSend(bIndex, 0);
+			return;
+		}
+
+		// Same cleanup as above but for the other player (bIndex)
+		gObjInventoryCommit(bIndex);
+		gItemManager.GCItemListSend(bIndex);
+#if(GAMESERVER_UPDATE>=802)
+		gEventInventory.GCEventItemListSend(bIndex);
+#endif
+		gObjectManager.CharacterMakePreviewCharSet(bIndex);
+		GDCharacterInfoSaveSend(bIndex);
+
+		// Clear both sides
+		this->ClearTrade(lpTarget); // bIndex player
+		this->ClearTrade(lpObj);    // bot
+
+		// Reset both interface states
+		lpTarget->Interface.use = 0;
+		lpTarget->Interface.type = INTERFACE_NONE;
+		lpTarget->Interface.state = 0;
+		lpTarget->TargetNumber = -1;
+		lpTarget->TradeOk = 0;
+		lpTarget->TradeOkTime = 0;
+		lpTarget->TradeMoney = 0;
+
+		lpObj->Interface.use = 0;
+		lpObj->Interface.type = INTERFACE_NONE;
+		lpObj->Interface.state = 0;
+		lpObj->TargetNumber = -1;
+		lpObj->TradeOk = 0;
+		lpObj->TradeOkTime = 0;
+		lpObj->TradeMoney = 0;
+
+		this->GCTradeResultSend(bIndex, 1);
+		return;
 	}
 
 	this->GCTradeOkButtonSend(bIndex,lpObj->TradeOk);
