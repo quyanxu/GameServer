@@ -110,11 +110,13 @@ public:
 	//void CheckAutoReset(LPOBJ lpObj); // Asegúrate que esta línea exista
 
 private:
+	std::string GetItemName(int itemType);
+	std::string ReplaceTradePlaceholders(const std::string& phrase, const std::string& botAccount);
 	DWORD m_dwLastCommentTick[MAX_OBJECT];
 	DWORD m_dwLastPlayerNearbyCommentTick[MAX_OBJECT]; // Nuevo cooldown
 	DWORD m_dwLastLocalChatTick[MAX_OBJECT]; // <-- AÑADE ESTA LÍNEA
     CRITICAL_SECTION m_BotDataMutex;
- 
+
 };
    
 // Funciones globales y variables externas
@@ -126,17 +128,20 @@ extern std::vector<std::string> g_BotPhrasesGeneral;
 extern std::vector<std::string> g_BotPhrasesNear;
 extern std::vector<std::string> g_BotPhrasesInParty; 
 extern std::vector<std::string> g_BotPhrasesPVP;
+extern std::vector<std::string> g_BotPhrasesTrade;
 // NUEVO: Frases según hora del día
 extern std::vector<std::string> g_BotPhrasesMorning;
 extern std::vector<std::string> g_BotPhrasesAfternoon;
 extern std::vector<std::string> g_BotPhrasesNight;
-extern std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific; 
+extern std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific;
+
 
 // NUEVO: Variables globales para probabilidades configurables
 extern int g_ProbGeneral;
 extern int g_ProbNearRealPlayer;
 extern int g_ProbInParty;
 extern int g_ProbPVP;
+extern int g_ProbTrade;
 // NUEVO: Probabilidades para hora del día
 extern int g_ProbMorning;
 extern int g_ProbAfternoon;

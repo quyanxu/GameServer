@@ -2,6 +2,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include <string>
+#include <sstream>
+#include <cctype>
 #include "stdafx.h" 
 #include "FakeOnline.h"
 #include "ItemManager.h"
@@ -24,7 +27,6 @@
 #include "Quest.h"
 #include "QuestObjective.h"
 #include <list>
-#include <string>
 #include "JSProtocol.h"
 #include "ObjectManager.h"
 #include "OfflineMode.h" 
@@ -38,7 +40,6 @@
 #include "Attack.h" 
 #include "Log.h" 
 #include <random> 
-#include <string> 
 #include "DefaultClassInfo.h" 
 #include <cmath> 
 #include "pugixml.hpp" 
@@ -46,6 +47,7 @@
 #include <ctime>   // For seeding random numbers
 #include "Trade.h"
 #include "BotTrader.h"
+
 
 // Function to trim leading and trailing whitespace from a string
 std::string trim(const std::string& str) {
@@ -66,6 +68,7 @@ std::vector<std::string> g_BotPhrasesGeneral;
 std::vector<std::string> g_BotPhrasesNear;
 std::vector<std::string> g_BotPhrasesInParty;
 std::vector<std::string> g_BotPhrasesPVP;
+std::vector<std::string> g_BotPhrasesTrade;
 // NUEVO: Frases por hora del día
 std::vector<std::string> g_BotPhrasesMorning;
 std::vector<std::string> g_BotPhrasesAfternoon;
@@ -75,7 +78,104 @@ std::map<std::string, std::vector<std::string>> g_KeywordResponses;
 std::map<int, std::vector<std::string>> g_BotPhrasesMapSpecific; 
 std::map<int, std::vector<std::string>> g_BotPhrasesClassSpecific;
 int g_ProbGeneral = 10, g_ProbNearRealPlayer = 15, g_ProbInParty = 12, g_ProbPVP = 20, g_ProbMorning = 20, g_ProbAfternoon = 20, g_ProbNight = 20, g_ProbMapSpecificBase = 10, g_ProbClassSpecificBase = 11;
+int g_ProbTrade = 25;
 // --- Fin de variables globales ---
+
+
+// NEW CODE (REPLACE THE RETURN LINE):
+std::string CFakeOnline::GetItemName(int itemType) {
+	static std::map<int, std::string> itemNames;
+	if (itemNames.empty()) {
+		// Jewels
+		itemNames[static_cast<int>(GET_ITEM(14, 13))] = "Jewel of Bless";
+		itemNames[static_cast<int>(GET_ITEM(14, 14))] = "Jewel of Soul";
+		itemNames[static_cast<int>(GET_ITEM(12, 15))] = "Jewel of Chaos";
+		itemNames[static_cast<int>(GET_ITEM(14, 16))] = "Jewel of Life";
+		itemNames[static_cast<int>(GET_ITEM(14, 22))] = "Jewel of Creation";
+		itemNames[static_cast<int>(GET_ITEM(14, 31))] = "Jewel of Guardian";
+		itemNames[static_cast<int>(GET_ITEM(14, 41))] = "Jewel of Gemstone";
+		itemNames[static_cast<int>(GET_ITEM(14, 42))] = "Jewel of Harmony";
+		itemNames[static_cast<int>(GET_ITEM(14, 43))] = "Lower Stone";
+		itemNames[static_cast<int>(GET_ITEM(14, 43))] = "Higher Stone";
+		// Add more items as needed
+	}
+
+	auto it = itemNames.find(itemType);
+	if (it != itemNames.end()) {
+		return it->second;
+	}
+
+	// If not found, return generic description - FIXED VERSION:
+	int type = (itemType >> 8) & 0xFF;
+	int index = itemType & 0xFF;
+	char buffer[50];
+	sprintf_s(buffer, sizeof(buffer), "Item(%d,%d)", type, index);
+	return std::string(buffer);
+}
+
+// Add this function to replace trade placeholders
+std::string CFakeOnline::ReplaceTradePlaceholders(const std::string& phrase, const std::string& botAccount) {
+	std::string acc = trim(botAccount);
+	std::transform(acc.begin(), acc.end(), acc.begin(), ::toupper);
+
+	auto it = m_TradeData.find(acc);
+	if (it == m_TradeData.end() || it->second.requiredItems.empty() || it->second.rewardItems.empty()) {
+		return phrase; // Return original phrase if no trade config
+	}
+
+	const auto& config = it->second;
+
+	// Build required items string
+	std::string requiredItems = "";
+	for (size_t i = 0; i < config.requiredItems.size(); i++) {
+		if (i > 0) requiredItems += " + ";
+		requiredItems += GetItemName(config.requiredItems[i].Type);
+
+		if (config.requiredItems[i].LevelMin > 0) {
+			char buffer[20];
+			sprintf_s(buffer, sizeof(buffer), "%d", config.requiredItems[i].LevelMin);
+			requiredItems += "+" + std::string(buffer);
+		}
+
+		if (config.requiredItems[i].Exc > 0) {
+			requiredItems += " Exc";
+		}
+	}
+
+	// Build reward items string
+	std::string rewardItems = "";
+	for (size_t i = 0; i < config.rewardItems.size(); i++) {
+		if (i > 0) rewardItems += " + ";
+		rewardItems += GetItemName(config.rewardItems[i].Type);
+
+		if (config.rewardItems[i].LevelMin > 0) {
+			char buffer[20];
+			sprintf_s(buffer, sizeof(buffer), "%d", config.rewardItems[i].LevelMin);
+			rewardItems += "+" + std::string(buffer);
+		}
+
+		if (config.rewardItems[i].Exc > 0) {
+			rewardItems += " Exc";
+		}
+	}
+
+	// Replace placeholders
+	std::string result = phrase;
+
+	size_t pos = 0;
+	while ((pos = result.find("{item_required}", pos)) != std::string::npos) {
+		result.replace(pos, 15, requiredItems);
+		pos += requiredItems.length();
+	}
+
+	pos = 0;
+	while ((pos = result.find("{item_reward}", pos)) != std::string::npos) {
+		result.replace(pos, 13, rewardItems);
+		pos += rewardItems.length();
+	}
+
+	return result;
+}
 
 // --- Funciones de Ayuda (static para evitar conflictos) ---
 static bool FakeisJewels(int index)
@@ -113,6 +213,7 @@ static int random_bot_range(int minN, int maxN)
 void FakeAutoRepair(int aIndex); 
 void FakeAnimationMove(int aIndex, int x, int y, bool dixa);
 // --- Fin Prototipos ---
+
 
 
 CFakeOnline::CFakeOnline()
@@ -211,6 +312,7 @@ void LoadBotPhrasesFromFile(const char* filename)
 	g_BotPhrasesMorning.clear();
 	g_BotPhrasesAfternoon.clear();
 	g_BotPhrasesNight.clear();
+	g_BotPhrasesTrade.clear(); // ADD THIS LINE
 
 	std::ifstream file(filename);
 	if (!file.is_open()) { return; }
@@ -242,6 +344,7 @@ void LoadBotPhrasesFromFile(const char* filename)
 						catch (...) {}
 					}
 				}
+
 				else if (selector_category == "#NEAR_REAL_PLAYER") {
 					mode = MODE_NEAR;
 					if (commaPos != std::string::npos) {
@@ -316,6 +419,16 @@ void LoadBotPhrasesFromFile(const char* filename)
 					}
 					mode = 1003;
 				}
+
+				else if (selector_category == "#TRADE") {
+					if (commaPos != std::string::npos) {
+						try { g_ProbTrade = std::stoi(line.substr(commaPos + 1)); }
+						catch (...) {}
+					}
+					mode = 1004; // New mode for TRADE
+				}
+
+
 				else {
 					mode = MODE_NONE;
 				}
@@ -356,6 +469,8 @@ void LoadBotPhrasesFromFile(const char* filename)
 			case 1001: g_BotPhrasesMorning.push_back(line); break;
 			case 1002: g_BotPhrasesAfternoon.push_back(line); break;
 			case 1003: g_BotPhrasesNight.push_back(line); break;
+			case 1004: g_BotPhrasesTrade.push_back(line); break;
+
 			}
 		}
 	}
@@ -495,7 +610,39 @@ void CFakeOnline::AttemptRandomBotComment(int aIndex)
 		}
 	}
 
+	if (CanTradeWithBot(lpObj) && !g_BotPhrasesTrade.empty()) {
+		if (rand() % 100 < g_ProbTrade) {
+			std::string phrase = g_BotPhrasesTrade[rand() % g_BotPhrasesTrade.size()];
 
+			// Replace trade placeholders
+			phrase = ReplaceTradePlaceholders(phrase, lpObj->Account);
+
+			// Replace {player_name} if applicable
+			if (nearbyPlayerName[0] != '\0') {
+				size_t pos = phrase.find("{player_name}");
+				if (pos != std::string::npos)
+					phrase.replace(pos, 13, nearbyPlayerName);
+			}
+
+			char msg[MAX_CHAT_MESSAGE_SIZE + 1] = { 0 };
+			strncpy_s(msg, sizeof(msg), phrase.c_str(), _TRUNCATE);
+
+			// Send via local chat
+			PMSG_CHAT_RECV chatMsg;
+			memset(&chatMsg, 0, sizeof(chatMsg));
+			chatMsg.header.set(0x00, sizeof(chatMsg));
+			strncpy_s(chatMsg.name, lpObj->Name, sizeof(chatMsg.name) - 1);
+			strncpy_s(chatMsg.message, msg, sizeof(chatMsg.message) - 1);
+
+			CGChatRecv(&chatMsg, lpObj->Index);
+			LogAdd(LOG_EVENT, "[FakeOnline][%s] Usó TRADE PHRASE: \"%s\"", lpObj->Name, msg);
+
+			this->m_dwLastCommentTick[aIndex] = GetTickCount();
+			this->m_dwLastLocalChatTick[aIndex] = GetTickCount();
+			LeaveCriticalSection(&this->m_BotDataMutex);
+			return;
+		}
+	}
 
     std::string phrase = GetRandomBotPhrase(lpObj->DBClass, lpObj->Map, realPlayerNearby, isInParty, botInActivePVPCombat);
     
