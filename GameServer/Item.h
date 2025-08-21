@@ -126,6 +126,8 @@ public:
 	bool CheckDurabilityState();
 	bool AddPetItemExp(int amount);
 	bool DecPetItemExp(int amount);
+	void ConvertItemByte(void* pItemInfo);
+
 public:
 	DWORD m_Serial;
 	short m_Index;

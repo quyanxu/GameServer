@@ -33,6 +33,32 @@ CItem::CItem() // OK
 	this->Clear();
 }
 
+#include "Item.h"
+
+// Add the ConvertItemByte method definition
+void CItem::ConvertItemByte(void* pItemInfo)
+{
+	if (!pItemInfo) return;
+
+	// Assuming pItemInfo is a structure that holds item data
+	BYTE* itemInfo = reinterpret_cast<BYTE*>(pItemInfo);
+
+	// Example: Fill the structure with item data
+	itemInfo[0] = static_cast<BYTE>(this->m_Index & 0xFF); // Item type
+	itemInfo[1] = static_cast<BYTE>(this->m_Index >> 8);   // Item index
+	itemInfo[2] = this->m_Level;                          // Item level
+	itemInfo[3] = this->m_Option1;                        // Option 1
+	itemInfo[4] = this->m_Option2;                        // Option 2
+	itemInfo[5] = this->m_Option3;                        // Option 3
+	itemInfo[6] = this->m_NewOption;                      // Excellent options
+	itemInfo[7] = this->m_SetOption;                      // Set options
+	itemInfo[8] = this->m_JewelOfHarmonyOption;           // Harmony option
+	itemInfo[9] = this->m_ItemOptionEx;                   // Additional options
+
+	// Add more fields as needed based on the structure of your item data
+}
+
+
 void CItem::Clear() // OK
 {
 	this->m_Serial = 0;

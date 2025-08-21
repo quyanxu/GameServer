@@ -1,8 +1,4 @@
-﻿// ItemManager.cpp: implementation of the CItemManager class.
-//
-//////////////////////////////////////////////////////////////////////
-
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "ItemManager.h"
 #include "BloodCastle.h"
 #include "CashShop.h"
@@ -49,7 +45,41 @@
 #include "CommandManager.h"
 #include "Monster.h"
 #include "MasterSkillTree.h"
+
+
+#include "Item.h"  
+#include "User.h"  
+
+int gObjAddItemInventory(int aIndex, CItem item)
+{
+	if (!gObjIsConnectedGP(aIndex))
+	{
+		return -1;
+	}
+
+	LPOBJ lpObj = &gObj[aIndex];
+
+	for (int i = 0; i < INVENTORY_SIZE; i++)
+	{
+		if (lpObj->Inventory[i].IsItem() == false)
+		{
+			lpObj->Inventory[i] = item;
+			lpObj->Inventory[i].m_Slot = i;
+			return i;
+		}
+	}
+
+	return -1; // Inventory is full  
+}
+//
+//////////////////////////////////////////////////////////////////////
+
+
+
+
+
 CItemManager gItemManager;
+
 
 ITEM_ATTRIBUTE ItemAttribute[MAX_ITEM]; //MC bot
 

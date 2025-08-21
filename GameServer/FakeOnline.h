@@ -94,13 +94,21 @@ public:
 	void ChatRecv(LPOBJ lpSender, const char* message);
 	void LoadFakeBotTradeConfig(const char* path);
 	bool CanStartTradeWithBot(int playerIndex, LPOBJ lpBot);
+	void SendBotTradeItemsToPlayer(int playerIndex, LPOBJ lpBot);
 	bool HandleFakeBotTrade(int playerIndex, LPOBJ lpBot);
 	void TradeCancel(int aIndex);
 	int CountTradeItems(int aIndex);
 	bool IsUniqueItemType(std::vector<MixesItems>& needList, int currentIndex);
+	void InitTradeDisplay(int playerIndex, LPOBJ lpBot);
+	void DebugTradePackets(int playerIndex);
+	void StoreBotTradeItems(LPOBJ lpBot, int playerIndex);
+	void GCTradeResponseSend(int aIndex, BYTE response, const char* name, int level, int guildNumber);
+	bool BotHasRewardItems(LPOBJ lpBot, const std::vector<MixesItems>& rewardItems);
+	bool MoveBotRewardItemsToTrade(LPOBJ lpBot, const std::vector<MixesItems>& rewardItems);
+	bool InitializeBotTrade(int playerIndex, LPOBJ lpBot);
+	int GetJewelBankCount(LPOBJ lpBot, int jewelType);
+	bool DecreaseBotJewelBank(LPOBJ lpBot, int jewelType, int count);
 
-
-	
 public:
 	std::map<std::string, FAKEBOT_TRADE_ITEM> m_TradeData;
 	std::map<std::string, OFFEXP_DATA> m_Data;

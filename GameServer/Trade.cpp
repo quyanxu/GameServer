@@ -23,6 +23,7 @@
 #include "BotStore.h"
 #include "BotTrader.h"
 #include "FakeOnline.h"
+#include "Protocol.h"
 
 CTrade gTrade;
 //////////////////////////////////////////////////////////////////////

@@ -124,6 +124,8 @@ int gGameServerDisconnect;
 int gObjOffStore;
 int gObjOffAttack;
 
+
+
 OBJECTSTRUCT_HEADER gObj;
 
 MESSAGE_STATE_MACHINE_HEADER gSMMsg;

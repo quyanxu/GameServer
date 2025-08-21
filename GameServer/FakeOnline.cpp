@@ -47,7 +47,8 @@
 #include <ctime>   // For seeding random numbers
 #include "Trade.h"
 #include "BotTrader.h"
-
+#include "user.h"
+#include "Warehouse.h"
 
 // Function to trim leading and trailing whitespace from a string
 std::string trim(const std::string& str) {
@@ -2381,10 +2382,160 @@ bool CFakeOnline::CanTradeWithBot(const LPOBJ lpBot)
 	return false;
 }
 
-bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
-	LogAdd(LOG_RED, "[FakeBotTrade] Se intentó trade con %s por %s", lpBot->Name, gObj[playerIndex].Name);
 
-	// FIX 1: Proper account key handling
+bool CFakeOnline::BotHasRewardItems(LPOBJ lpBot, const std::vector<MixesItems>& rewardItems) {
+	if (!lpBot || rewardItems.empty()) return false;
+
+	std::vector<bool> itemsFound(rewardItems.size(), false);
+
+	// Check bot's regular inventory for reward items
+	for (int slot = INVENTORY_WEAR_SIZE; slot < INVENTORY_WEAR_SIZE + INVENTORY_SIZE; slot++) {
+		if (!lpBot->Inventory[slot].IsItem()) continue;
+
+		CItem* pItem = &lpBot->Inventory[slot];
+
+		for (size_t i = 0; i < rewardItems.size(); i++) {
+			if (itemsFound[i]) continue; // Already found this item
+
+			const auto& reward = rewardItems[i];
+			if (pItem->m_Index == reward.Type &&
+				pItem->m_Level >= reward.LevelMin &&
+				pItem->m_Option3 >= reward.OptionMin &&
+				pItem->m_Option2 >= reward.Luck &&
+				pItem->m_Option1 >= reward.Skill &&
+				pItem->m_NewOption >= reward.Exc &&
+				pItem->m_Durability >= reward.Dur) {
+				itemsFound[i] = true;
+				LogAdd(LOG_BLUE, "[FakeBotTrade] Found reward item %d in inventory slot %d", reward.Type, slot);
+				break;
+			}
+		}
+	}
+
+	// Check bot's jewel bank counters for remaining unfound jewel items
+	for (size_t i = 0; i < rewardItems.size(); i++) {
+		if (itemsFound[i]) continue; // Already found this item
+
+		const auto& reward = rewardItems[i];
+		int jewelCount = GetJewelBankCount(lpBot, reward.Type);
+
+		if (jewelCount > 0) {
+			// For jewels, we only check type and level (jewels don't have options/exc/etc.)
+			if (reward.LevelMin == 0 || reward.LevelMin <= jewelCount) { // Treat level as minimum count needed
+				itemsFound[i] = true;
+				LogAdd(LOG_BLUE, "[FakeBotTrade] Found reward jewel %d in bank (count: %d)", reward.Type, jewelCount);
+			}
+		}
+	}
+
+	// Check if all reward items are found
+	for (size_t i = 0; i < itemsFound.size(); i++) {
+		if (!itemsFound[i]) {
+			LogAdd(LOG_RED, "[FakeBotTrade] Bot %s missing reward item index %d (checked inventory + jewel bank)", lpBot->Name, (int)i);
+			return false;
+		}
+	}
+
+	LogAdd(LOG_GREEN, "[FakeBotTrade] Bot %s has all required reward items", lpBot->Name);
+	return true;
+}
+
+
+int CFakeOnline::GetJewelBankCount(LPOBJ lpBot, int jewelType) {
+	if (!lpBot) return 0;
+
+	switch (jewelType) {
+	case GET_ITEM(12, 15): return lpBot->ChaosBank;      // Chaos
+	case GET_ITEM(14, 13): return lpBot->BlessBank;      // Bless
+	case GET_ITEM(14, 14): return lpBot->SoulBank;       // Soul
+	case GET_ITEM(14, 16): return lpBot->LifeBank;       // Life
+	case GET_ITEM(14, 22): return lpBot->CreateonBank;   // Creation
+	case GET_ITEM(14, 31): return lpBot->GuardianBank;   // Guardian
+	case GET_ITEM(14, 42): return lpBot->HarmonyBank;    // Harmony
+	case GET_ITEM(14, 43): return lpBot->LowStoneBank;   // Lower Stone
+	case GET_ITEM(14, 44): return lpBot->HighStoneBank;  // Higher Stone
+	case GET_ITEM(14, 41): return lpBot->GemStoneBank;   // Gemstone
+	default: return 0;
+	}
+}
+
+// Helper function to decrease jewel bank counter for specific jewel type
+bool CFakeOnline::DecreaseBotJewelBank(LPOBJ lpBot, int jewelType, int count) {
+	if (!lpBot || count <= 0) return false;
+
+	switch (jewelType) {
+	case GET_ITEM(12, 15): // Chaos
+		if (lpBot->ChaosBank >= count) {
+			lpBot->ChaosBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 13): // Bless
+		if (lpBot->BlessBank >= count) {
+			lpBot->BlessBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 14): // Soul
+		if (lpBot->SoulBank >= count) {
+			lpBot->SoulBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 16): // Life
+		if (lpBot->LifeBank >= count) {
+			lpBot->LifeBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 22): // Creation
+		if (lpBot->CreateonBank >= count) {
+			lpBot->CreateonBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 31): // Guardian
+		if (lpBot->GuardianBank >= count) {
+			lpBot->GuardianBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 42): // Harmony
+		if (lpBot->HarmonyBank >= count) {
+			lpBot->HarmonyBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 43): // Lower Stone
+		if (lpBot->LowStoneBank >= count) {
+			lpBot->LowStoneBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 44): // Higher Stone
+		if (lpBot->HighStoneBank >= count) {
+			lpBot->HighStoneBank -= count;
+			return true;
+		}
+		break;
+	case GET_ITEM(14, 41): // Gemstone
+		if (lpBot->GemStoneBank >= count) {
+			lpBot->GemStoneBank -= count;
+			return true;
+		}
+		break;
+	default:
+		return false;
+	}
+	return false;
+}
+
+
+
+bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
+	LogAdd(LOG_RED, "[FakeBotTrade] Trade attempt with %s by %s", lpBot->Name, gObj[playerIndex].Name);
+
+	// Get trade configuration
 	std::string acc = trim(lpBot->Account);
 	std::transform(acc.begin(), acc.end(), acc.begin(), ::toupper);
 
@@ -2395,19 +2546,27 @@ bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
 	}
 
 	const auto& config = it->second;
-	if (config.requiredItems.empty()) {
-		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No hay requerimientos configurados.");
+
+	if (config.requiredItems.empty() || config.rewardItems.empty()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Configuración de trade inválida.");
 		return false;
 	}
 
-	// Validar cantidad de ítems
+	// FIXED: Check if bot actually has the reward items
+	if (!BotHasRewardItems(lpBot, config.rewardItems)) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "El bot no tiene los items requeridos para el trade.");
+		LogAdd(LOG_RED, "[FakeBotTrade] Bot %s doesn't have required reward items", lpBot->Name);
+		return false;
+	}
+
+	// Validate player items count
 	int itemCount = CountTradeItems(playerIndex);
 	if (itemCount != config.requiredItems.size()) {
 		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Debes poner %d items requeridos.", config.requiredItems.size());
 		return false;
 	}
 
-	// FIX 2: Proper item validation including type check
+	// Validate player items match requirements
 	std::vector<bool> reqFound(config.requiredItems.size(), false);
 
 	for (int n = 0; n < TRADE_SIZE; n++) {
@@ -2415,10 +2574,10 @@ bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
 		if (!pItem->IsItem()) continue;
 
 		for (size_t reqIdx = 0; reqIdx < config.requiredItems.size(); reqIdx++) {
-			if (reqFound[reqIdx]) continue; // Already found this requirement
+			if (reqFound[reqIdx]) continue;
 
 			const auto& req = config.requiredItems[reqIdx];
-			if (pItem->m_Index == req.Type &&              // Check item type
+			if (pItem->m_Index == req.Type &&
 				pItem->m_Level >= req.LevelMin &&
 				pItem->m_Option3 >= req.OptionMin &&
 				pItem->m_Option2 >= req.Luck &&
@@ -2439,14 +2598,8 @@ bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
 		}
 	}
 
-	// FIX 3: Better inventory space check
-	if (config.rewardItems.empty()) {
-		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "No hay recompensas configuradas.");
-		return false;
-	}
-
-	// Check space for reward items
-	for (size_t i = 0; i < config.rewardItems.size(); ++i) {
+	// Check inventory space for player
+	for (size_t i = 0; i < config.rewardItems.size(); i++) {
 		const auto& reward = config.rewardItems[i];
 		if (gItemManager.CheckItemInventorySpace(&gObj[playerIndex],
 			gItemManager.GetItemWidth(reward.Type),
@@ -2456,7 +2609,7 @@ bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
 		}
 	}
 
-	// FIX 4: Success rate check
+	// Success rate check
 	if (config.successRate < 100) {
 		int random = rand() % 100;
 		if (random >= config.successRate) {
@@ -2465,24 +2618,83 @@ bool CFakeOnline::HandleFakeBotTrade(int playerIndex, LPOBJ lpBot) {
 		}
 	}
 
-	// FIX 5: Give all reward items, not just first one
-	for (std::vector<MixesItems>::const_iterator it = config.rewardItems.begin(); it != config.rewardItems.end(); ++it) {
-		const MixesItems& reward = *it;
+	// FIXED: Move bot's reward items to trade window BEFORE showing to player
+	if (!MoveBotRewardItemsToTrade(lpBot, config.rewardItems)) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Error moviendo items del bot al trade.");
+		return false;
+	}
+
+	// FIXED: Now send bot items to player (they should be visible now)
+	SendBotTradeItemsToPlayer(playerIndex, lpBot);
+
+	// Store player items in bot inventory
+	StoreBotTradeItems(lpBot, playerIndex);
+
+	// Give reward items to player
+	for (size_t i = 0; i < config.rewardItems.size(); i++) {
+		const auto& reward = config.rewardItems[i];
 
 		GDCreateItemSend(playerIndex, 235, 0, 0, reward.Type, reward.LevelMin, 0,
 			reward.Skill, reward.Luck, reward.OptionMin, -1, reward.Exc, 0, 0, 0, 0, 0xFE, 0);
 	}
 
-	// FIX 6: Proper trade completion
 	gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Trade completado con éxito.");
 
-	// Clear trade items and close trade window
-	//for (int i = 0; i < TRADE_SIZE; i++) {
-	//	gObj[playerIndex].Trade[i].Clear();
-	//}
+	// Clear trade windows
+	for (int i = 0; i < TRADE_SIZE; i++) {
+		gObj[playerIndex].Trade[i].Clear();
+		lpBot->Trade[i].Clear();
+	}
 
-	// Close trade interface
-	//gTrade.GCTradeResultSend(playerIndex, 1); // 1 = success
+	return true;
+}
+
+
+bool CFakeOnline::InitializeBotTrade(int playerIndex, LPOBJ lpBot) {
+	if (!CanStartTradeWithBot(playerIndex, lpBot)) {
+		return false;
+	}
+
+	// Get trade configuration
+	std::string acc = trim(lpBot->Account);
+	std::transform(acc.begin(), acc.end(), acc.begin(), ::toupper);
+
+	auto it = m_TradeData.find(acc);
+	if (it == m_TradeData.end()) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Este bot no puede hacer trade.");
+		return false;
+	}
+
+	const auto& config = it->second;
+
+	// FIXED: Check if bot has required items BEFORE accepting trade
+	if (!BotHasRewardItems(lpBot, config.rewardItems)) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "El bot no tiene los items necesarios en este momento.");
+		LogAdd(LOG_RED, "[FakeBotTrade] Bot %s cannot trade - missing items", lpBot->Name);
+		return false;
+	}
+
+	// Accept trade and prepare bot items
+	if (!MoveBotRewardItemsToTrade(lpBot, config.rewardItems)) {
+		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "Error preparando items del bot.");
+		return false;
+	}
+
+	// Send acceptance packet
+	BYTE tradeAcceptPacket[10];
+	tradeAcceptPacket[0] = 0xC1;
+	tradeAcceptPacket[1] = 10;
+	tradeAcceptPacket[2] = 0x36;  // Trade request response
+	tradeAcceptPacket[3] = 0x01;  // Accept
+	memcpy(&tradeAcceptPacket[4], lpBot->Name, 6);
+
+	DataSend(playerIndex, tradeAcceptPacket, 10);
+
+	// Now show bot items to player
+	SendBotTradeItemsToPlayer(playerIndex, lpBot);
+
+	LogAdd(LOG_GREEN, "[FakeBotTrade] Trade initialized successfully between %s and %s",
+		gObj[playerIndex].Name, lpBot->Name);
 
 	return true;
 }
@@ -2621,6 +2833,8 @@ void CFakeOnline::LoadFakeBotTradeConfig(const char* path) {
 	LogAdd(LOG_GREEN, "[FakeBotTrade] Carga completa: Bots: %d | Items requeridos: %d | Recompensas: %d", botsCargados, itemsReq, rewards);
 }
 
+
+
 bool CFakeOnline::CanStartTradeWithBot(int playerIndex, LPOBJ lpBot) {
 	if (!lpBot || !CanTradeWithBot(lpBot)) {
 		gNotice.NewNoticeSend(playerIndex, 0, 0, 0, 0, 0, "FakeBot: Este bot no puede hacer trade.");
@@ -2636,6 +2850,8 @@ bool CFakeOnline::CanStartTradeWithBot(int playerIndex, LPOBJ lpBot) {
 }
 
 
+
+
 int CFakeOnline::CountTradeItems(int aIndex) {
 	int count = 0;
 	for (int i = 0; i < TRADE_SIZE; ++i) {
@@ -2645,6 +2861,128 @@ int CFakeOnline::CountTradeItems(int aIndex) {
 	}
 	return count;
 }
+
+
+void CFakeOnline::SendBotTradeItemsToPlayer(int playerIndex, LPOBJ lpBot) {
+	if (!lpBot) return;
+
+	for (int i = 0; i < TRADE_SIZE; i++) {
+		if (lpBot->Trade[i].IsItem()) {
+			CItem* pItem = &lpBot->Trade[i];
+
+			BYTE packet[25];
+			packet[0] = 0xC1;           // Header type
+			packet[1] = 25;             // Packet size
+			packet[2] = 0x3C;           // Trade protocol
+			packet[3] = 0x00;           // Add item to trade subcode
+			packet[4] = 0x01;           // Success
+			packet[5] = i;              // Trade slot
+
+			// Item data
+			packet[6] = (BYTE)((pItem->m_Index >> 8) & 0xFF);  // Item type
+			packet[7] = (BYTE)(pItem->m_Index & 0xFF);         // Item index
+			packet[8] = pItem->m_Level;                        // Level
+			packet[9] = pItem->m_Durability;                   // Durability
+			packet[10] = pItem->m_Option1;                     // Skill
+			packet[11] = pItem->m_Option2;                     // Luck
+			packet[12] = pItem->m_Option3;                     // Option
+			packet[13] = pItem->m_NewOption;                   // Excellent options
+			packet[14] = pItem->m_SetOption;                   // Set options
+			packet[15] = 0;                                    // Socket options (if available)
+			packet[16] = 0;
+			packet[17] = 0;
+			packet[18] = 0;
+			packet[19] = 0;
+			packet[20] = (BYTE)(pItem->m_Number & 0xFF);       // Item serial low
+			packet[21] = (BYTE)((pItem->m_Number >> 8) & 0xFF); // Item serial high
+			packet[22] = (BYTE)((pItem->m_Number >> 16) & 0xFF);
+			packet[23] = (BYTE)((pItem->m_Number >> 24) & 0xFF);
+			packet[24] = 0xFF;                                 // Item color/other data
+
+			DataSend(playerIndex, packet, 25);
+
+			LogAdd(LOG_BLUE, "[FakeBotTrade] Sent bot item %d (slot %d) to player %s",
+				pItem->m_Index, i, gObj[playerIndex].Name);
+		}
+	}
+}
+
+
+bool CFakeOnline::MoveBotRewardItemsToTrade(LPOBJ lpBot, const std::vector<MixesItems>& rewardItems) {
+	if (!lpBot || rewardItems.empty()) return false;
+
+	int tradeSlot = 0;
+
+	for (size_t rewardIdx = 0; rewardIdx < rewardItems.size() && tradeSlot < TRADE_SIZE; rewardIdx++) {
+		const auto& reward = rewardItems[rewardIdx];
+		bool itemMoved = false;
+
+		// First try to find the item in bot's regular inventory
+		for (int slot = INVENTORY_WEAR_SIZE; slot < INVENTORY_WEAR_SIZE + INVENTORY_SIZE && !itemMoved; slot++) {
+			if (!lpBot->Inventory[slot].IsItem()) continue;
+
+			CItem* pItem = &lpBot->Inventory[slot];
+
+			if (pItem->m_Index == reward.Type &&
+				pItem->m_Level >= reward.LevelMin &&
+				pItem->m_Option3 >= reward.OptionMin &&
+				pItem->m_Option2 >= reward.Luck &&
+				pItem->m_Option1 >= reward.Skill &&
+				pItem->m_NewOption >= reward.Exc &&
+				pItem->m_Durability >= reward.Dur) {
+
+				// Move item from inventory to trade
+				memcpy(&lpBot->Trade[tradeSlot], pItem, sizeof(CItem));
+				lpBot->Inventory[slot].Clear(); // Remove from inventory
+
+				LogAdd(LOG_GREEN, "[FakeBotTrade] Moved item %d from inventory to trade slot %d", reward.Type, tradeSlot);
+				tradeSlot++;
+				itemMoved = true;
+			}
+		}
+
+		// If not found in inventory, try to create from jewel bank counter
+		if (!itemMoved) {
+			int jewelCount = GetJewelBankCount(lpBot, reward.Type);
+			if (jewelCount > 0) {
+				// Create the jewel item in trade slot
+				CItem newJewel;
+				newJewel.Clear();
+				newJewel.m_Index = reward.Type;
+				newJewel.m_Level = reward.LevelMin;
+				newJewel.m_Option1 = reward.Skill;
+				newJewel.m_Option2 = reward.Luck;
+				newJewel.m_Option3 = reward.OptionMin;
+				newJewel.m_NewOption = reward.Exc;
+				newJewel.m_Durability = reward.Dur > 0 ? reward.Dur : 255;
+				newJewel.Convert(newJewel.m_Index, newJewel.m_Option1, newJewel.m_Option2, newJewel.m_Option3, newJewel.m_NewOption, newJewel.m_SetOption, newJewel.m_JewelOfHarmonyOption, newJewel.m_ItemOptionEx, newJewel.m_SocketOption, newJewel.m_SocketOptionBonus);
+
+				// Copy to trade slot
+				memcpy(&lpBot->Trade[tradeSlot], &newJewel, sizeof(CItem));
+
+				// Decrease jewel bank counter
+				if (DecreaseBotJewelBank(lpBot, reward.Type, 1)) {
+					LogAdd(LOG_GREEN, "[FakeBotTrade] Created jewel %d from bank to trade slot %d", reward.Type, tradeSlot);
+					tradeSlot++;
+					itemMoved = true;
+				}
+				else {
+					// Failed to decrease bank, clear the trade slot
+					lpBot->Trade[tradeSlot].Clear();
+					LogAdd(LOG_RED, "[FakeBotTrade] Failed to decrease jewel bank for item %d", reward.Type);
+				}
+			}
+		}
+
+		if (!itemMoved) {
+			LogAdd(LOG_RED, "[FakeBotTrade] Failed to move reward item %d to trade (not found in inventory or jewel bank)", reward.Type);
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 bool CFakeOnline::IsUniqueItemType(std::vector<MixesItems>& needList, int currentIndex) {
 	if (currentIndex == 0) return true;
@@ -2659,6 +2997,45 @@ bool CFakeOnline::IsUniqueItemType(std::vector<MixesItems>& needList, int curren
 void CFakeOnline::TradeCancel(int aIndex) {
 	gTrade.ResetTrade(aIndex);
 	gTrade.GCTradeResultSend(aIndex, 0);
+}
+
+
+void CFakeOnline::StoreBotTradeItems(LPOBJ lpBot, int playerIndex) {
+	if (!lpBot) return;
+
+	LPOBJ lpPlayer = &gObj[playerIndex];
+	if (!lpPlayer) return;
+
+	// Manual storage
+	for (int i = 0; i < TRADE_SIZE; i++) {
+		if (lpPlayer->Trade[i].IsItem()) {
+			// Find empty slot manually
+			for (int slot = INVENTORY_WEAR_SIZE; slot < INVENTORY_WEAR_SIZE + INVENTORY_SIZE; slot++) {
+				if (!lpBot->Inventory[slot].IsItem()) {
+					// Copy item directly
+					memcpy(&lpBot->Inventory[slot], &lpPlayer->Trade[i], sizeof(CItem));
+					break;
+				}
+			}
+		}
+	}
+}
+
+
+void CFakeOnline::DebugTradePackets(int playerIndex) {
+	// Try different packet codes to see which one works
+	for (int code = 0x30; code <= 0x40; code++) {
+		BYTE testPacket[20];
+		testPacket[0] = 0xC3;
+		testPacket[1] = 20;
+		testPacket[2] = code;       // Try different codes
+		testPacket[3] = 0x01;       // Subcode
+		testPacket[4] = 0;          // Slot
+		testPacket[5] = 0x01;       // Success
+
+		DataSend(playerIndex, testPacket, 6);
+		Sleep(50);
+	}
 }
 
 #endif // USE_FAKE_ONLINE == TRUE

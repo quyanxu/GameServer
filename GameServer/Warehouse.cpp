@@ -1,7 +1,5 @@
-// Warehouse.cpp: implementation of the CWarehouse class.
-//
-//////////////////////////////////////////////////////////////////////
-
+ 
+#include "Log.h"  
 #include "stdafx.h"
 #include "Warehouse.h"
 #include "DSProtocol.h"
@@ -29,6 +27,7 @@ CWarehouse::~CWarehouse() // OK
 {
 
 }
+
 
 int CWarehouse::GetWarehouseTaxMoney(int level,int lock) // OK
 {
