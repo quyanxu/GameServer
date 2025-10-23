@@ -990,6 +990,9 @@
     <ClInclude Include="Licencia.h">
       <Filter>Source Files\Licencia</Filter>
     </ClInclude>
+    <ClInclude Include="ClassConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -1801,6 +1804,9 @@
     </ClCompile>
     <ClCompile Include="Licencia.cpp">
       <Filter>Source Files\Licencia</Filter>
+    </ClCompile>
+    <ClCompile Include="ClassConfig.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

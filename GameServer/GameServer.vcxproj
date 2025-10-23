@@ -329,6 +329,7 @@
     <ClInclude Include="ChangeReset.h" />
     <ClInclude Include="ChaosBox.h" />
     <ClInclude Include="ChaosCastle.h" />
+    <ClInclude Include="ClassConfig.h" />
     <ClInclude Include="ComboSkill.h" />
     <ClInclude Include="Command.h" />
     <ClInclude Include="CommandManager.h" />
@@ -608,6 +609,7 @@
     <ClCompile Include="ChangeReset.cpp" />
     <ClCompile Include="ChaosBox.cpp" />
     <ClCompile Include="ChaosCastle.cpp" />
+    <ClCompile Include="ClassConfig.cpp" />
     <ClCompile Include="ComboSkill.cpp" />
     <ClCompile Include="Command.cpp" />
     <ClCompile Include="CommandManager.cpp" />

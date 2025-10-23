@@ -515,10 +515,10 @@ void Marry::CommandCore(LPOBJ lpObj,BYTE Command)
 			{
 				if(lpObj->MarryCharacterInfo.Married == 1)
 				{
-					gNotice.GCNoticeSend(lpObj->Index,1,0,0,0,0,0,"Estas casado con %s",lpObj->MarryCharacterInfo.MarryTarget);
+					gNotice.GCNoticeSend(lpObj->Index,1,0,0,0,0,0,"Married with %s",lpObj->MarryCharacterInfo.MarryTarget);
 				}else
 				{
-					gNotice.GCNoticeSend(lpObj->Index,1,0,0,0,0,0,"¿Por qué no te casas aún?");
+					gNotice.GCNoticeSend(lpObj->Index,1,0,0,0,0,0,"Why are you still single?");
 				}
 
 			}break;

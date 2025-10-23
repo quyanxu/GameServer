@@ -4684,7 +4684,7 @@ bool CObjectManager::CharacterInfoSet(BYTE* aRecv,int aIndex) // OK
 
 	if(lpObj->MarryCharacterInfo.Married == 1)
 	{
-		LogAdd(LOG_BLUE,"[PlayerMarryInfo] %s - Casado: %s",lpObj->Name,lpObj->MarryCharacterInfo.MarriedName);
+		LogAdd(LOG_BLUE,"[PlayerMarryInfo] %s - Married: %s",lpObj->Name,lpObj->MarryCharacterInfo.MarriedName);
 	} 
 
 	if(lpObj->PKLevel == 3)

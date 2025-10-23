@@ -1601,7 +1601,7 @@ void CNpcTalk::CGNpcTalkRecv(PMSG_NPC_TALK_RECV* lpMsg,int aIndex) // OK
 	{
 		if(lpObj->MarryCharacterInfo.Married == 0)
 		{
-			gNotice.NewNoticeSend(lpObj->Index,0,0,0,0,0,"Solo casados pueden usar esta SHOP");
+			gNotice.NewNoticeSend(lpObj->Index,0,0,0,0,0,"SHOP for married users");
 			return;
 		}
 	}

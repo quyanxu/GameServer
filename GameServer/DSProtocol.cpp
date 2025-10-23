@@ -1435,11 +1435,11 @@ void DGCharacterInfoRecv(SDHP_CHARACTER_INFO_RECV* lpMsg) // OK
 
 		if (lpObj->MarryCharacterInfo.Married == 1)
 		{
-			gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "Estas casado: %s", lpObj->MarryCharacterInfo.MarriedName);
+			gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "You are married: %s", lpObj->MarryCharacterInfo.MarriedName);
 		}
 		else
 		{
-			gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "Aún no estas casado");
+			gNotice.NewNoticeSend(lpObj->Index, 0, 0, 0, 0, 0, "You are not married");
 		}	
 
 	if( lpObj->Authority == 32)

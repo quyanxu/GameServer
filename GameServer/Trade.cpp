@@ -24,6 +24,7 @@
 #include "BotTrader.h"
 #include "FakeOnline.h"
 #include "Protocol.h"
+#include "Notice.h"
 
 CTrade gTrade;
 //////////////////////////////////////////////////////////////////////
@@ -123,101 +124,129 @@ void CTrade::ExchangeTradeItemLog(LPOBJ lpObj,LPOBJ lpTarget) // OK
 	}
 }
 
-void CTrade::CGTradeRequestRecv(PMSG_TRADE_REQUEST_RECV* lpMsg,int aIndex) // OK
+void CTrade::CGTradeRequestRecv(PMSG_TRADE_REQUEST_RECV* lpMsg, int aIndex)
 {
-	if(gServerInfo.m_TradeSwitch == 0)
+	if (gServerInfo.m_TradeSwitch == 0)
 	{
 		return;
 	}
 
 	LPOBJ lpObj = &gObj[aIndex];
 
-	if(gObjIsConnectedGP(aIndex) == 0)
+	if (gObjIsConnectedGP(aIndex) == 0)
 	{
 		return;
 	}
 
-	int bIndex = MAKE_NUMBERW(lpMsg->index[0],lpMsg->index[1]);
+	int bIndex = MAKE_NUMBERW(lpMsg->index[0], lpMsg->index[1]);
 
-	if(gObjIsConnectedGP(bIndex) == 0)
+	if (gObjIsConnectedGP(bIndex) == 0)
 	{
 		return;
 	}
 
 	LPOBJ lpTarget = &gObj[bIndex];
 
-	if(lpObj->Interface.use != 0 || lpTarget->Interface.use != 0)
+	if (lpObj->Interface.use != 0 || lpTarget->Interface.use != 0)
 	{
 		return;
 	}
 
-	if(CA_MAP_RANGE(lpTarget->Map) != 0 || DS_MAP_RANGE(lpTarget->Map) != 0 || BC_MAP_RANGE(lpTarget->Map) != 0 || CC_MAP_RANGE(lpTarget->Map) != 0 || IT_MAP_RANGE(lpTarget->Map) != 0 || DA_MAP_RANGE(lpTarget->Map) != 0 || DG_MAP_RANGE(lpTarget->Map) != 0 || IG_MAP_RANGE(lpTarget->Map) != 0)
+	if (CA_MAP_RANGE(lpTarget->Map) != 0 || DS_MAP_RANGE(lpTarget->Map) != 0 || BC_MAP_RANGE(lpTarget->Map) != 0 || CC_MAP_RANGE(lpTarget->Map) != 0 || IT_MAP_RANGE(lpTarget->Map) != 0 || DA_MAP_RANGE(lpTarget->Map) != 0 || DG_MAP_RANGE(lpTarget->Map) != 0 || IG_MAP_RANGE(lpTarget->Map) != 0)
 	{
-		this->GCTradeResponseSend(aIndex,0,lpTarget->Name,0,0);
+		this->GCTradeResponseSend(aIndex, 0, lpTarget->Name, 0, 0);
 		return;
 	}
 
-	if(lpObj->X < (lpTarget->X-2) || lpObj->X > (lpTarget->X+2) || lpObj->Y < (lpTarget->Y-2) || lpObj->Y > (lpTarget->Y+2))
+	if (lpObj->X < (lpTarget->X - 2) || lpObj->X >(lpTarget->X + 2) || lpObj->Y < (lpTarget->Y - 2) || lpObj->Y >(lpTarget->Y + 2))
 	{
-		this->GCTradeResponseSend(aIndex,0,lpTarget->Name,0,0);
+		this->GCTradeResponseSend(aIndex, 0, lpTarget->Name, 0, 0);
 		return;
 	}
 
-	if(lpObj->PShopOpen != 0 || lpTarget->PShopOpen != 0)
+	if (lpObj->PShopOpen != 0 || lpTarget->PShopOpen != 0)
 	{
-		this->GCTradeResponseSend(aIndex,0,lpTarget->Name,0,0);
+		this->GCTradeResponseSend(aIndex, 0, lpTarget->Name, 0, 0);
 		return;
 	}
 
-	if(gEventHideAndSeek.EventHideAndSeekTrade(aIndex,bIndex) == 1)
-	{
-		return;
-	}
-
-	if(gEventPvP.EventPvPTradeJoin(aIndex,bIndex) == 1)
+	if (gEventHideAndSeek.EventHideAndSeekTrade(aIndex, bIndex) == 1)
 	{
 		return;
 	}
 
-	if(gEventRussianRoulette.EventRussianRouletteTrade(aIndex,bIndex) == 1)
+	if (gEventPvP.EventPvPTradeJoin(aIndex, bIndex) == 1)
 	{
 		return;
 	}
 
-	if((lpTarget->Option & 1) == 0)
-	{
-		this->GCTradeResponseSend(aIndex,0,lpTarget->Name,0,0);
-		return;
-	}
-
-	//MC bot
-	// SCF BOTS
-	
-	int	number = MAKE_NUMBERW(lpMsg->index[0],lpMsg->index[1]);
-
-	if ( OBJMAX_RANGE(number) == FALSE )
-	{
-		LogAdd(LOG_BLACK,"Error : %s %d (%d)", __FILE__, __LINE__, number);
-		return;
-	}
-	if ( number == aIndex )
+	if (gEventRussianRoulette.EventRussianRouletteTrade(aIndex, bIndex) == 1)
 	{
 		return;
 	}
 
-	if(ObjBotBuff.TradeOpen(aIndex,number) == 1)
+	if ((lpTarget->Option & 1) == 0)
 	{
+		this->GCTradeResponseSend(aIndex, 0, lpTarget->Name, 0, 0);
 		return;
 	}
-	if(BotAlchemist.TradeOpen(aIndex,number) == 1)
+
+	// *** MOVE BOT CHECKS HERE - BEFORE SETTING UP INTERFACE ***
+	int number = MAKE_NUMBERW(lpMsg->index[0], lpMsg->index[1]);
+
+	if (OBJMAX_RANGE(number) == FALSE)
 	{
+		LogAdd(LOG_BLACK, "Error : %s %d (%d)", __FILE__, __LINE__, number);
 		return;
 	}
-	if(BotTrader.TradeOpen(aIndex,number) == 1)
+	if (number == aIndex)
 	{
 		return;
 	}
 
+	// Check bot trades BEFORE setting up interface
+	if (ObjBotBuff.TradeOpen(aIndex, number) == 1)
+	{
+		return;
+	}
+	if (BotAlchemist.TradeOpen(aIndex, number) == 1)
+	{
+		return;
+	}
+	if (BotTrader.TradeOpen(aIndex, number) == 1)
+	{
+		return;
+	}
+
+	// *** NOW CHECK FOR FAKEBOT TRADE ***
+	if (lpTarget->IsFakeOnlineBot)
+	{
+		// Only allow trade if this bot is in the trade list
+		if (!s_FakeOnline.CanTradeWithBot(lpTarget))
+		{
+			this->GCTradeResponseSend(aIndex, 0, lpTarget->Name, 0, 0);
+			gNotice.NewNoticeSend(aIndex, 0, 0, 0, 0, 0, "Este bot no acepta trades.");
+			return;
+		}
+
+		// Initialize FakeBot trade
+		if (!s_FakeOnline.InitializeBotTrade(aIndex, lpTarget))
+		{
+			return;
+		}
+
+		// Set up interface for player only
+		lpObj->Interface.use = 1;
+		lpObj->Interface.type = INTERFACE_TRADE;
+		lpObj->Interface.state = 0;
+		lpObj->InterfaceTime = GetTickCount();
+		lpObj->TargetNumber = bIndex;
+
+		// FakeBot interface is handled in InitializeBotTrade
+		return;
+	}
+
+	// *** NORMAL TRADE SETUP (for non-bot trades) ***
 	lpObj->Interface.use = 1;
 	lpObj->Interface.type = INTERFACE_TRADE;
 	lpObj->Interface.state = 0;
@@ -230,7 +259,7 @@ void CTrade::CGTradeRequestRecv(PMSG_TRADE_REQUEST_RECV* lpMsg,int aIndex) // OK
 	lpTarget->InterfaceTime = GetTickCount();
 	lpTarget->TargetNumber = aIndex;
 
-	this->GCTradeRequestSend(bIndex,lpObj->Name);
+	this->GCTradeRequestSend(bIndex, lpObj->Name);
 }
 
 void CTrade::CGTradeResponseRecv(PMSG_TRADE_RESPONSE_RECV* lpMsg,int aIndex) // OK

@@ -49,6 +49,7 @@
 #include "BotTrader.h"
 #include "user.h"
 #include "Warehouse.h"
+#include "ResetTable.h"
 
 // Function to trim leading and trailing whitespace from a string
 std::string trim(const std::string& str) {
@@ -273,9 +274,9 @@ void CFakeOnline::LoadFakeData(char* path)
     this->m_Data.clear(); 
     this->m_botPVPCombatStates.clear(); 
     this->IndexMsgMax = 0; this->IndexMsgMin = 0;
-    LoadBotPhrasesFromFile(".\\BotPhrases.txt");
-	LoadBotKeywordResponses(".\\Answering.txt");
-	this->LoadFakeBotTradeConfig(".\\FakeBotTrade.txt");
+    LoadBotPhrasesFromFile(".\\IA\\Phrases\\BotPhrases.txt");
+	LoadBotKeywordResponses(".\\IA\\Answers\\Answering.txt");
+	this->LoadFakeBotTradeConfig(".\\IA\\Trade\\FakeBotTrade.txt");
     if (!path) { LeaveCriticalSection(&this->m_BotDataMutex); return; }
     pugi::xml_document file;
     if (file.load_file(path).status != pugi::status_ok){ ErrorMessageBox("XML Load Fail: %s", path); LeaveCriticalSection(&this->m_BotDataMutex); return; }
@@ -1210,10 +1211,16 @@ void CFakeOnline::Attack(int aIndex)
 {
 	if (OBJMAX_RANGE(aIndex) == FALSE) { return; }
 	if (!gObjIsConnectedGP(aIndex)) { return; }
+
 	LPOBJ lpObj = &gObj[aIndex];
-	this->CheckAutoReset(lpObj); // Chequeamos si el bot debe resetear antes de cualquier otra acción.
-	if (lpObj->IsFakeOnline == 0 || !lpObj->IsFakeRegen) { return; } 
-	if (lpObj->State == OBJECT_DELCMD || lpObj->DieRegen != 0 || lpObj->Teleport != 0 || lpObj->RegenOk > 0 ) { return; } 
+
+	// **ONLY check auto-reset for FakeBots**
+	if (lpObj->IsFakeOnlineBot) {
+		this->CheckAutoReset(lpObj);
+	}
+
+	if (lpObj->IsFakeOnline == 0 || !lpObj->IsFakeRegen) { return; }
+	if (lpObj->State == OBJECT_DELCMD || lpObj->DieRegen != 0 || lpObj->Teleport != 0 || lpObj->RegenOk > 0) { return; }
 	if (gServerInfo.InSafeZone(aIndex) == true) { return; }
 
     OFFEXP_DATA* pBotData = this->GetOffExpInfo(lpObj);
@@ -1999,39 +2006,46 @@ void CFakeOnline::TuDongDanhSkill(int aIndex)
 
 void CFakeOnline::CheckAutoReset(LPOBJ lpObj)
 {
-	// Obtenemos la configuración específica de este bot
+	// **CRITICAL: Only process for FakeBots**
+	if (!lpObj->IsFakeOnlineBot) {
+		return; // Real players use CommandReset or CommandResetAutoProc
+	}
+
+	// Get bot configuration
 	OFFEXP_DATA* pBotData = this->GetOffExpInfo(lpObj);
 
-	// Si no hay data para este bot o si el auto-reset no está activado (debe ser 1), salimos.
-	if (pBotData == nullptr || pBotData->TuDongReset != 1)
-	{
+	// Only auto-reset if enabled for this bot
+	if (pBotData == nullptr || pBotData->TuDongReset != 1) {
 		return;
 	}
 
-	// Verificamos si el bot cumple con el nivel requerido para el reset.
-	// Usamos la configuración global del servidor (gServerInfo) para máxima compatibilidad.
-		if (lpObj->Level < *gServerInfo.m_CommandResetLevel)
+	// **Use the same level check as real players**
+	int requiredLevel = gResetTable.GetResetLevel(lpObj);
+	int currentLevel = (gMasterSkillTree.CheckMasterLevel(lpObj) == 0)
+		? lpObj->Level
+		: (lpObj->Level + lpObj->MasterLevel);
 
-	{
+	if (currentLevel < requiredLevel) {
 		return;
 	}
 
-	// Verificamos si el bot tiene el dinero necesario para el reset.
-	// Verificamos si el bot tiene el dinero necesario para el reset.
-		if (lpObj->Money < static_cast<unsigned int>(*reinterpret_cast<int*>(&gServerInfo.m_CommandResetMoney)))
-		{
-			return;
-		}
+	// Check money requirement
+	int requiredMoney = gResetTable.GetResetMoney(lpObj);
+	if (lpObj->Money < static_cast<unsigned int>(requiredMoney)) {
+		return;
+	}
 
-	// ¡El bot cumple todos los requisitos! Es hora de resetear.
-	// La solución más limpia y estable es hacer que el bot ejecute el comando /reset.
-	// Esto reutiliza tu código ya existente y asegura que todos los procesos de reseteo se completen correctamente.
+	// Check reset limit
+	if (lpObj->Reset >= gServerInfo.m_CommandResetLimit[lpObj->AccountLevel]) {
+		return;
+	}
 
-	LogAdd(LOG_EVENT, "[FakeOnline][AutoReset] El Bot '%s' (Nivel %d) cumple los requisitos y ejecutará /reset.", lpObj->Name, lpObj->Level);
+	// **Bot meets requirements - execute reset**
+	LogAdd(LOG_EVENT, "[FakeOnline][AutoReset] Bot '%s' executing reset (Level: %d/%d, Money: %d/%d)",
+		lpObj->Name, currentLevel, requiredLevel, lpObj->Money, requiredMoney);
 
-	gCommandManager.CommandReset(lpObj, "/reset", true); // Example: Adding a third argument
-
-
+	// Call CommandReset with bot flag enabled (Npc = -1, isBotAutoReset = true)
+	gCommandManager.CommandReset(lpObj, "/reset", -1, true);
 }
 
 
@@ -2347,6 +2361,7 @@ void CFakeOnline::ChatRecv(LPOBJ lpSender, const char* message)
 			if (replyOptions.empty()) continue;
 
 			std::string reply = replyOptions[rand() % replyOptions.size()];
+			//reply = ReplaceTradePlaceholders(reply, lpBot->Account);
 			size_t pos = reply.find("{player_name}");
 			if (pos != std::string::npos)
 				reply.replace(pos, 13, lpSender->Name);

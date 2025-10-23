@@ -38,6 +38,8 @@
 #include "SwampEvent.h"
 #include "User.h"
 #include "Guild.h"
+#include "Path.h"
+#include "ClassConfig.h"
 
 
 TCHAR szTitle[MAX_LOADSTRING];
@@ -72,6 +74,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdLine
 	SetLargeRand();
 
 	gServerInfo.ReadStartupInfo("GameServerInfo",".\\Data\\GameServerInfo - Common.dat");
+	// Initialize class configuration
+	g_ClassConfigManager.Initialize();
 
 	#if(PROTECT_STATE==1)
 
@@ -335,7 +339,7 @@ LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) // 
 #if USE_FAKE_ONLINE == TRUE
 
 				case ID_FAKEONLINE_RELOADDATA:
-					s_FakeOnline.LoadFakeData(".\\IA.xml");
+					s_FakeOnline.LoadFakeData(".\\IA\\Accounts.xml");
 					break;
 				case ID_FAKEONLINE_ADDFAKEONLINE:
 				{
@@ -364,6 +368,14 @@ LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) // 
 					}
 				}
 				break;
+
+				// In your WndProc or command handler
+				case ID_FAKEONLINE_CREATEBOTS:
+				{
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_CREATEBOTS), hWnd, CreateBotsDialogProc);
+					break;
+				}
+
 #endif
 
 				//==================================================================================================================================================
@@ -661,6 +673,687 @@ LRESULT CALLBACK WndProc(HWND hWnd,UINT message,WPARAM wParam,LPARAM lParam) // 
 	}
 
 	return 0;
+}
+
+// ====================================
+// CLASS CONFIGURATION DIALOG
+// ====================================
+
+INT_PTR CALLBACK ConfigClassDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	static HWND hComboClass, hComboConfigSelect;
+	static int selectedClassCode = 0;
+	static int selectedConfig = 1;
+
+	switch (message)
+	{
+	case WM_INITDIALOG:
+	{
+		// Add config selector combo
+		hComboConfigSelect = GetDlgItem(hDlg, IDC_COMBO_CONFIGSELECT);
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 1 (ClassConfig.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 2 (ClassConfig2.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 3 (ClassConfig3.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 4 (ClassConfig4.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 5 (ClassConfig5.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 6 (ClassConfig6.ini)");
+		SendMessage(hComboConfigSelect, CB_ADDSTRING, 0, (LPARAM)"Config 7 (ClassConfig7.ini)");
+		SendMessage(hComboConfigSelect, CB_SETCURSEL, 0, 0);
+
+		hComboClass = GetDlgItem(hDlg, IDC_COMBO_CLASSCONFIG);
+
+		std::map<int, ClassHexData>& allClasses = g_ClassConfigManager.GetAllClasses();
+		for (std::map<int, ClassHexData>::iterator it = allClasses.begin(); it != allClasses.end(); ++it)
+		{
+			ClassHexData& data = it->second;
+			int idx = SendMessage(hComboClass, CB_ADDSTRING, 0, (LPARAM)data.className.c_str());
+			SendMessage(hComboClass, CB_SETITEMDATA, idx, (LPARAM)data.classCode);
+		}
+
+		SendMessage(hComboClass, CB_SETCURSEL, 0, 0);
+
+		selectedClassCode = 0;
+		selectedConfig = 1;
+		ClassHexData* data = g_ClassConfigManager.GetClassData(0, 1);
+		if (data)
+		{
+			SetDlgItemText(hDlg, IDC_EDIT_CLASSINVHEX, data->inventoryHex.c_str());
+			SetDlgItemText(hDlg, IDC_EDIT_CLASSMAGICHEX, data->magicListHex.c_str());
+		}
+
+		return TRUE;
+	}
+
+	case WM_COMMAND:
+	{
+		// Config selector changed
+		if (LOWORD(wParam) == IDC_COMBO_CONFIGSELECT && HIWORD(wParam) == CBN_SELCHANGE)
+		{
+			selectedConfig = SendMessage(hComboConfigSelect, CB_GETCURSEL, 0, 0) + 1;
+
+			ClassHexData* data = g_ClassConfigManager.GetClassData(selectedClassCode, selectedConfig);
+			if (data)
+			{
+				SetDlgItemText(hDlg, IDC_EDIT_CLASSINVHEX, data->inventoryHex.c_str());
+				SetDlgItemText(hDlg, IDC_EDIT_CLASSMAGICHEX, data->magicListHex.c_str());
+			}
+			return TRUE;
+		}
+		// Class changed
+		else if (LOWORD(wParam) == IDC_COMBO_CLASSCONFIG && HIWORD(wParam) == CBN_SELCHANGE)
+		{
+			int idx = SendMessage(hComboClass, CB_GETCURSEL, 0, 0);
+			selectedClassCode = (int)SendMessage(hComboClass, CB_GETITEMDATA, idx, 0);
+
+			ClassHexData* data = g_ClassConfigManager.GetClassData(selectedClassCode, selectedConfig);
+			if (data)
+			{
+				SetDlgItemText(hDlg, IDC_EDIT_CLASSINVHEX, data->inventoryHex.c_str());
+				SetDlgItemText(hDlg, IDC_EDIT_CLASSMAGICHEX, data->magicListHex.c_str());
+			}
+			return TRUE;
+		}
+		else if (LOWORD(wParam) == IDC_BTN_SAVECLASS)
+		{
+			char invHex[8192] = { 0 };
+			char magicHex[2048] = { 0 };
+
+			GetDlgItemText(hDlg, IDC_EDIT_CLASSINVHEX, invHex, sizeof(invHex));
+			GetDlgItemText(hDlg, IDC_EDIT_CLASSMAGICHEX, magicHex, sizeof(magicHex));
+
+			if (strlen(invHex) < 10 || strlen(magicHex) < 10)
+			{
+				MessageBox(hDlg, "Please enter valid hex strings!", "Error", MB_OK | MB_ICONERROR);
+				return TRUE;
+			}
+
+			g_ClassConfigManager.SetClassData(selectedClassCode, invHex, magicHex, selectedConfig);
+
+			char msg[256];
+			sprintf_s(msg, sizeof(msg), "Saved to Config %d!\n\nYou can now:\n- Configure another class\n- Switch to another config", selectedConfig);
+			MessageBox(hDlg, msg, "Success", MB_OK | MB_ICONINFORMATION);
+			return TRUE;
+		}
+		else if (LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, IDCANCEL);
+			return TRUE;
+		}
+		break;
+	}
+	}
+
+	return FALSE;
+}
+
+
+
+// ====================================
+// SIMPLIFIED BOT CREATOR DIALOG
+// ====================================
+
+INT_PTR CALLBACK CreateBotsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	static HWND hComboClass, hComboPartyMode, hComboPVPMode;
+
+	switch (message)
+	{
+	case WM_INITDIALOG:
+	{
+		// Basic config
+		SetDlgItemInt(hDlg, IDC_EDIT_BOTCOUNT, 50, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_STARTFROM, 1, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_GATENUMBER, 614, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MAP, 0, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MAPX, 110, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MAPY, 200, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MINLEVEL, 250, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MAXLEVEL, 400, FALSE);
+
+		// Bot behavior defaults
+		SetDlgItemInt(hDlg, IDC_EDIT_PHAMVITRAIN, 6, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_MOVERANGE, 30, FALSE);
+		SetDlgItemInt(hDlg, IDC_EDIT_TIMERETURN, 40, FALSE);
+		CheckDlgButton(hDlg, IDC_CHECK_TUNHATITEM, BST_CHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_TUDONGRESET, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_POSTKHIDIE, BST_CHECKED);
+
+		// NEW: Config checkboxes (default: only Config 1 enabled)
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG1, BST_CHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG2, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG3, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG4, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG5, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG6, BST_UNCHECKED);
+		CheckDlgButton(hDlg, IDC_CHECK_CONFIG7, BST_UNCHECKED);
+
+		// Show info about available configs
+		int availableConfigs = g_ClassConfigManager.GetAvailableConfigCount();
+		char configInfo[256];
+		sprintf_s(configInfo, sizeof(configInfo),
+			"Available Configs: %d/7\n(Check multiple for variety)", availableConfigs);
+		SetDlgItemText(hDlg, IDC_STATIC_CONFIGINFO, configInfo);
+
+		// Class combo
+		hComboClass = GetDlgItem(hDlg, IDC_COMBO_CLASS);
+		SendMessage(hComboClass, CB_ADDSTRING, 0, (LPARAM)"All Classes (Mixed)");
+		SendMessage(hComboClass, CB_SETITEMDATA, 0, (LPARAM)-1);
+
+		std::map<int, ClassHexData>& allClasses = g_ClassConfigManager.GetAllClasses();
+		for (std::map<int, ClassHexData>::iterator it = allClasses.begin(); it != allClasses.end(); ++it)
+		{
+			ClassHexData& data = it->second;
+			int idx = SendMessage(hComboClass, CB_ADDSTRING, 0, (LPARAM)data.className.c_str());
+			SendMessage(hComboClass, CB_SETITEMDATA, idx, (LPARAM)data.classCode);
+		}
+		SendMessage(hComboClass, CB_SETCURSEL, 0, 0);
+
+		// Party Mode combo
+		hComboPartyMode = GetDlgItem(hDlg, IDC_COMBO_PARTYMODE);
+		SendMessage(hComboPartyMode, CB_ADDSTRING, 0, (LPARAM)"0 - Disabled");
+		SendMessage(hComboPartyMode, CB_ADDSTRING, 0, (LPARAM)"1 - Accept Party Invites");
+		SendMessage(hComboPartyMode, CB_ADDSTRING, 0, (LPARAM)"2 - Send Party Invites");
+		SendMessage(hComboPartyMode, CB_SETCURSEL, 1, 0);
+
+		// PVP Mode combo
+		hComboPVPMode = GetDlgItem(hDlg, IDC_COMBO_PVPMODE);
+		SendMessage(hComboPVPMode, CB_ADDSTRING, 0, (LPARAM)"0 - Disabled");
+		SendMessage(hComboPVPMode, CB_ADDSTRING, 0, (LPARAM)"1 - Defend Only");
+		SendMessage(hComboPVPMode, CB_ADDSTRING, 0, (LPARAM)"2 - Attack All Players");
+		SendMessage(hComboPVPMode, CB_SETCURSEL, 1, 0);
+
+		return TRUE;
+	}
+
+	case WM_COMMAND:
+	{
+		if (LOWORD(wParam) == IDC_BTN_CONFIGCLASS)
+		{
+			HWND hConfigDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_CONFIGCLASS), hDlg, ConfigClassDialogProc);
+			if (hConfigDlg == NULL)
+			{
+				char errMsg[256];
+				sprintf_s(errMsg, sizeof(errMsg), "Failed to open config dialog!\nError: %d", GetLastError());
+				MessageBox(hDlg, errMsg, "Warning", MB_OK | MB_ICONWARNING);
+				LogAdd(LOG_RED, "[CreateBots] Failed to open IDD_CONFIGCLASS dialog, error: %d", GetLastError());
+			}
+			else
+			{
+				ShowWindow(hConfigDlg, SW_SHOW);
+			}
+			return TRUE;
+		}
+		else if (LOWORD(wParam) == IDC_BTN_CREATEBOTS)
+		{
+			BOOL bSuccess;
+
+			// Get all parameters
+			int botCount = GetDlgItemInt(hDlg, IDC_EDIT_BOTCOUNT, &bSuccess, FALSE);
+			if (!bSuccess || botCount < 1 || botCount > 1000)
+			{
+				MessageBox(hDlg, "Bot count: 1-1000", "Error", MB_OK | MB_ICONERROR);
+				return TRUE;
+			}
+
+			int startFrom = GetDlgItemInt(hDlg, IDC_EDIT_STARTFROM, &bSuccess, FALSE);
+			if (!bSuccess || startFrom < 1)
+			{
+				MessageBox(hDlg, "Start From must be >= 1", "Error", MB_OK | MB_ICONERROR);
+				return TRUE;
+			}
+
+			int gateNumber = GetDlgItemInt(hDlg, IDC_EDIT_GATENUMBER, &bSuccess, FALSE);
+			int mapNumber = GetDlgItemInt(hDlg, IDC_EDIT_MAP, &bSuccess, FALSE);
+			int mapX = GetDlgItemInt(hDlg, IDC_EDIT_MAPX, &bSuccess, FALSE);
+			int mapY = GetDlgItemInt(hDlg, IDC_EDIT_MAPY, &bSuccess, FALSE);
+			int minLevel = GetDlgItemInt(hDlg, IDC_EDIT_MINLEVEL, &bSuccess, FALSE);
+			int maxLevel = GetDlgItemInt(hDlg, IDC_EDIT_MAXLEVEL, &bSuccess, FALSE);
+
+			if (!bSuccess || minLevel < 1 || maxLevel > 400 || minLevel > maxLevel)
+			{
+				MessageBox(hDlg, "Level range: 1-400 (min <= max)", "Error", MB_OK | MB_ICONERROR);
+				return TRUE;
+			}
+
+			// Bot behavior
+			int phamViTrain = GetDlgItemInt(hDlg, IDC_EDIT_PHAMVITRAIN, &bSuccess, FALSE);
+			int moveRange = GetDlgItemInt(hDlg, IDC_EDIT_MOVERANGE, &bSuccess, FALSE);
+			int timeReturn = GetDlgItemInt(hDlg, IDC_EDIT_TIMERETURN, &bSuccess, FALSE);
+			int tuNhatItem = (IsDlgButtonChecked(hDlg, IDC_CHECK_TUNHATITEM) == BST_CHECKED) ? 1 : 0;
+			int tuDongReset = (IsDlgButtonChecked(hDlg, IDC_CHECK_TUDONGRESET) == BST_CHECKED) ? 1 : 0;
+			int postKhiDie = (IsDlgButtonChecked(hDlg, IDC_CHECK_POSTKHIDIE) == BST_CHECKED) ? 1 : 0;
+
+			int partyMode = SendMessage(hComboPartyMode, CB_GETCURSEL, 0, 0);
+			int pvpMode = SendMessage(hComboPVPMode, CB_GETCURSEL, 0, 0);
+
+			int idx = SendMessage(hComboClass, CB_GETCURSEL, 0, 0);
+			int selectedClass = (int)SendMessage(hComboClass, CB_GETITEMDATA, idx, 0);
+
+			// NEW: Get enabled configs (bitmask)
+			int enabledConfigs = 0;
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG1) == BST_CHECKED) enabledConfigs |= (1 << 0);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG2) == BST_CHECKED) enabledConfigs |= (1 << 1);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG3) == BST_CHECKED) enabledConfigs |= (1 << 2);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG4) == BST_CHECKED) enabledConfigs |= (1 << 3);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG5) == BST_CHECKED) enabledConfigs |= (1 << 4);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG6) == BST_CHECKED) enabledConfigs |= (1 << 5);
+			if (IsDlgButtonChecked(hDlg, IDC_CHECK_CONFIG7) == BST_CHECKED) enabledConfigs |= (1 << 6);
+
+			if (enabledConfigs == 0)
+			{
+				MessageBox(hDlg, "Please select at least one Config to use!", "Error", MB_OK | MB_ICONERROR);
+				return TRUE;
+			}
+
+			// Show progress warning for large batches
+			if (botCount > 100)
+			{
+				char msg[256];
+				sprintf_s(msg, sizeof(msg),
+					"WARNING: Creating %d bots at once may cause instability.\n\n"
+					"Recommended: Create in batches of 50-100.\n\n"
+					"Continue anyway?", botCount);
+				if (MessageBox(hDlg, msg, "Warning", MB_YESNO | MB_ICONWARNING) != IDYES)
+					return TRUE;
+			}
+
+			// Disable dialog during creation
+			EnableWindow(hDlg, FALSE);
+			SetCursor(LoadCursor(NULL, IDC_WAIT));
+
+			// Call creation function with config selection
+			if (CreateMultipleBotsAdvanced(botCount, startFrom, gateNumber, mapNumber, mapX, mapY,
+				minLevel, maxLevel, selectedClass, phamViTrain, moveRange, timeReturn,
+				tuNhatItem, tuDongReset, partyMode, pvpMode, postKhiDie, enabledConfigs))
+			{
+				// Count how many configs were used
+				int configCount = 0;
+				for (int i = 0; i < 7; i++)
+				{
+					if (enabledConfigs & (1 << i)) configCount++;
+				}
+
+				char szMsg[512];
+				sprintf_s(szMsg, sizeof(szMsg),
+					"Successfully created %d bots!\n\n"
+					"Range: Bot%04d to Bot%04d\n"
+					"Location: %s\n"
+					"Levels: %d-%d\n"
+					"Config Variations: %d\n\n"
+					"Files:\n- Generated\\IA_Accounts.xml\n- Generated\\CreateBots.sql\n\n"
+					"How to use:\nExecute CreateBots.sql, then update:\nAccounts.xml with IA_Accounts.xml\n\n"
+					"Finally: 1) Reload IA, 2) ADD IA",
+					botCount, startFrom, startFrom + botCount - 1,
+					(gateNumber > 0) ? "Gate" : "Custom Coords",
+					minLevel, maxLevel, configCount);
+
+				SetCursor(LoadCursor(NULL, IDC_ARROW));
+				EnableWindow(hDlg, TRUE);
+				MessageBox(hDlg, szMsg, "Success", MB_OK | MB_ICONINFORMATION);
+				EndDialog(hDlg, IDOK);
+			}
+			else
+			{
+				SetCursor(LoadCursor(NULL, IDC_ARROW));
+				EnableWindow(hDlg, TRUE);
+				MessageBox(hDlg, "Failed to create bots.\n\nCheck console logs for details.", "Error", MB_OK | MB_ICONERROR);
+			}
+
+			return TRUE;
+		}
+		else if (LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, IDCANCEL);
+			return TRUE;
+		}
+		break;
+	}
+	}
+
+	return FALSE;
+}
+
+// ====================================
+// ADVANCED BOT CREATION WITH DELAYS
+// ====================================
+
+// Updated CreateMultipleBotsAdvanced with multi-config support
+// Add this parameter to the function signature:
+bool CreateMultipleBotsAdvanced(int botCount, int startFrom, int gateNumber, int mapNumber, int mapX, int mapY,
+	int minLevel, int maxLevel, int selectedClass, int phamViTrain, int moveRange, int timeReturn,
+	int tuNhatItem, int tuDongReset, int partyMode, int pvpMode, int postKhiDie, int enabledConfigs) // NEW PARAMETER
+{
+	// SAFETY CHECKS
+	if (botCount > 1000 || botCount < 1)
+	{
+		LogAdd(LOG_RED, "[CreateBots] ERROR: Bot count must be 1-1000");
+		return false;
+	}
+
+	if (startFrom < 1)
+	{
+		LogAdd(LOG_RED, "[CreateBots] ERROR: Start From must be >= 1!");
+		return false;
+	}
+
+	LogAdd(LOG_BLACK, "[CreateBots] Starting: Count=%d, StartFrom=%d, EnabledConfigs=%d",
+		botCount, startFrom, enabledConfigs);
+
+	// Class configuration
+	struct ClassConfig {
+		int classCode;
+		const char* className;
+		int mainSkill;
+		int secondarySkill;
+		int buff1, buff2, buff3;
+		int percentage;
+		int str, dex, vit, ene, cmd;
+		bool useFemaleNames;
+	};
+
+	ClassConfig classes[] = {
+		{0,  "DW",  9,   12,  16,  -1,  -1, 15, 2000, 2000, 2000, 5000, 0,    false},
+		{16, "DK",  44,  41,  48,  -1,  -1, 30, 5000, 4500, 5500, 4000, 0,    false},
+		{32, "ELF", 24,  52,  26,  27,  28, 20, 2500, 4500, 2500, 3000, 0,    true},
+		{48, "MG",  8,  55,   -1,  -1,  -1, 10, 4000, 3000, 4000, 4000, 0,    false},
+		{64, "DL",  65,  61,  64,  -1,  -1, 10, 4500, 3500, 4500, 2500, 5000, false},
+		{80, "SUM", 214, 215, 217, 218, -1, 10, 2000, 2000, 2000, 5000, 0,    true},
+		{96, "RF",  264, 263, 266, 268, -1, 5,  4500, 4500, 4500, 2000, 0,    false}
+	};
+
+	const char* maleNames[] = {
+		"Carlos","Diego","Miguel","Juan","Pedro","Luis","Jorge","Fernando","Ricardo","Roberto",
+		"Sergio","Andres","Javier","Marco","Oscar","Daniel","Gabriel","Rafael","Adrian","Mario",
+		"Eduardo","Ernesto","Pablo","Raul","Alberto","Victor","Manuel","Felipe","Emilio","Hugo"
+	};
+
+	const char* femaleNames[] = {
+		"Maria","Ana","Sofia","Isabella","Valentina","Camila","Victoria","Lucia","Elena","Paula",
+		"Carmen","Laura","Diana","Andrea","Natalia","Carolina","Gabriela","Daniela","Alejandra","Fernanda"
+	};
+
+	int maleNamesCount = sizeof(maleNames) / sizeof(maleNames[0]);
+	int femaleNamesCount = sizeof(femaleNames) / sizeof(femaleNames[0]);
+	int classCount = sizeof(classes) / sizeof(classes[0]);
+
+	// Calculate cumulative percentages
+	int cumulativePercentages[10];
+	int total = 0;
+	for (int i = 0; i < classCount; i++)
+	{
+		total += classes[i].percentage;
+		cumulativePercentages[i] = total;
+	}
+
+	// Bot data structure - CRITICAL: Use heap allocation for large batches
+	struct BotData {
+		char account[11];
+		char charName[11];
+		ClassConfig* classInfo;
+		int level;
+		int finalMapX;
+		int finalMapY;
+		int configIndex; // NEW: Which config to use (1-7)
+	};
+
+	// CRITICAL FIX: Use dynamic allocation instead of vector for large batches
+	BotData* botList = (BotData*)malloc(sizeof(BotData) * botCount);
+	if (!botList)
+	{
+		LogAdd(LOG_RED, "[CreateBots] CRITICAL: Memory allocation failed!");
+		return false;
+	}
+	memset(botList, 0, sizeof(BotData) * botCount);
+
+	// Generate bot data
+	for (int i = 0; i < botCount; i++)
+	{
+		BotData* bot = &botList[i];
+		int botNumber = startFrom + i;
+
+		// SAFE string formatting
+		if (sprintf_s(bot->account, sizeof(bot->account), "Bot%04d", botNumber) < 0)
+		{
+			LogAdd(LOG_RED, "[CreateBots] String formatting error at bot %d", i);
+			free(botList);
+			return false;
+		}
+
+		// Select class
+		ClassConfig* selectedClassConfig = NULL;
+
+		if (selectedClass == -1)
+		{
+			int randValue = i % 100;
+			for (int j = 0; j < classCount; j++)
+			{
+				if (randValue < cumulativePercentages[j])
+				{
+					selectedClassConfig = &classes[j];
+					break;
+				}
+			}
+		}
+		else
+		{
+			for (int j = 0; j < classCount; j++)
+			{
+				if (classes[j].classCode == selectedClass)
+				{
+					selectedClassConfig = &classes[j];
+					break;
+				}
+			}
+		}
+
+		if (!selectedClassConfig) selectedClassConfig = &classes[0];
+		bot->classInfo = selectedClassConfig;
+
+		// NEW: Randomly select a config from enabled ones
+		bot->configIndex = g_ClassConfigManager.GetRandomConfigIndex(enabledConfigs);
+
+		// Check class configuration
+		if (!g_ClassConfigManager.IsClassConfigured(selectedClassConfig->classCode, bot->configIndex))
+		{
+			LogAdd(LOG_RED, "[CreateBots] ERROR: Class %s not configured in Config %d!",
+				selectedClassConfig->className, bot->configIndex);
+
+			char errMsg[256];
+			sprintf_s(errMsg, sizeof(errMsg),
+				"Class '%s' is not configured in Config %d!\n\nConfigure it first.",
+				selectedClassConfig->className, bot->configIndex);
+			MessageBox(NULL, errMsg, "Error", MB_OK | MB_ICONWARNING);
+			free(botList);
+			return false;
+		}
+
+		// Generate character name SAFELY
+		if (selectedClassConfig->useFemaleNames)
+		{
+			int nameIdx = GetLargeRand() % femaleNamesCount;
+			sprintf_s(bot->charName, sizeof(bot->charName), "%s%d", femaleNames[nameIdx], GetLargeRand() % 90 + 10);
+		}
+		else
+		{
+			int nameIdx = GetLargeRand() % maleNamesCount;
+			sprintf_s(bot->charName, sizeof(bot->charName), "%s%d", maleNames[nameIdx], GetLargeRand() % 90 + 10);
+		}
+
+		// Random level
+		bot->level = minLevel + (GetLargeRand() % (maxLevel - minLevel + 1));
+
+		// Calculate position
+		bot->finalMapX = mapX + ((i % 20) - 10);
+		bot->finalMapY = mapY + (((i / 20) % 20) - 10);
+	}
+
+	// =====================================================
+	// GENERATE XML FILE WITH CHUNKED WRITING
+	// =====================================================
+	char xmlPath[260];
+	sprintf_s(xmlPath, sizeof(xmlPath), "IA\\Generated\\IA_Accounts.xml");
+
+	FILE* xmlFile = NULL;
+	errno_t err = fopen_s(&xmlFile, xmlPath, "w");
+	if (err != 0 || !xmlFile)
+	{
+		LogAdd(LOG_RED, "[CreateBots] ERROR: Cannot create XML file (error %d)", err);
+		free(botList);
+		return false;
+	}
+
+	// Set larger buffer for file operations
+	setvbuf(xmlFile, NULL, _IOFBF, 32768);
+
+	fprintf(xmlFile, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\n");
+	fprintf(xmlFile, "<MSGThongBao IndexMesMin=\"3020\" IndexMesMax=\"3030\"/>\n\n");
+	fprintf(xmlFile, "<Config DelayRange=\"40000\" />\n\n");
+	fprintf(xmlFile, "<FakeOnlineData>\n");
+
+	// CRITICAL: Write in chunks with error checking
+	for (int i = 0; i < botCount; i++)
+	{
+		const BotData* bot = &botList[i];
+
+		int result = fprintf(xmlFile,
+			"  <Info Account=\"%s\" Password=\"123456\" Name=\"%s\" "
+			"SkillID=\"%d\" SecondarySkillID=\"%d\" "
+			"UseBuffs_0=\"%d\" UseBuffs_1=\"%d\" UseBuffs_2=\"%d\" "
+			"GateNumber=\"%d\" Map=\"%d\" MapX=\"%d\" MapY=\"%d\" "
+			"PhamViTrain=\"%d\" MoveRange=\"%d\" TimeReturn=\"%d\" "
+			"TuNhatItem=\"%d\" TuDongReset=\"%d\" "
+			"PartyMode=\"%d\" PVPMode=\"%d\" PostKhiDie=\"%d\" />\n",
+			bot->account, bot->charName,
+			bot->classInfo->mainSkill, bot->classInfo->secondarySkill,
+			bot->classInfo->buff1, bot->classInfo->buff2, bot->classInfo->buff3,
+			gateNumber, mapNumber, bot->finalMapX, bot->finalMapY,
+			phamViTrain, moveRange, timeReturn,
+			tuNhatItem, tuDongReset,
+			partyMode, pvpMode, postKhiDie
+		);
+
+		if (result < 0)
+		{
+			LogAdd(LOG_RED, "[CreateBots] XML write error at bot %d", i);
+			fclose(xmlFile);
+			free(botList);
+			return false;
+		}
+
+		// Flush every 10 bots
+		if ((i + 1) % 10 == 0)
+		{
+			fflush(xmlFile);
+			if ((i + 1) % 50 == 0)
+			{
+				LogAdd(LOG_BLUE, "[CreateBots] XML: %d/%d", i + 1, botCount);
+			}
+		}
+	}
+
+	fprintf(xmlFile, "</FakeOnlineData>\n");
+	fflush(xmlFile);
+	fclose(xmlFile);
+
+	LogAdd(LOG_GREEN, "[CreateBots] XML completed");
+
+	// =====================================================
+	// GENERATE SQL FILE WITH CHUNKED WRITING
+	// =====================================================
+	char sqlPath[260];
+	sprintf_s(sqlPath, sizeof(sqlPath), "IA\\Generated\\CreateBots.sql");
+
+	FILE* sqlFile = NULL;
+	err = fopen_s(&sqlFile, sqlPath, "w");
+	if (err != 0 || !sqlFile)
+	{
+		LogAdd(LOG_RED, "[CreateBots] ERROR: Cannot create SQL file (error %d)", err);
+		free(botList);
+		return false;
+	}
+
+	// Set larger buffer
+	setvbuf(sqlFile, NULL, _IOFBF, 65536);
+
+	fprintf(sqlFile, "USE MuOnline\nGO\n\n");
+	fprintf(sqlFile, "-- Generated SQL for %d bots (Bot%04d to Bot%04d)\n",
+		botCount, startFrom, startFrom + botCount - 1);
+	fprintf(sqlFile, "-- Using %d different config variations\n\n",
+		__popcnt(enabledConfigs)); // Count set bits
+
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+	fprintf(sqlFile, "-- Date: %04d-%02d-%02d %02d:%02d:%02d\n\n",
+		st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+
+	// Generate SQL with error checking
+	for (int i = 0; i < botCount; i++)
+	{
+		const BotData* bot = &botList[i];
+
+		// NEW: Get hex from specific config
+		const char* invHex = g_ClassConfigManager.GetInventoryHex(bot->classInfo->classCode, bot->configIndex);
+		const char* magicHex = g_ClassConfigManager.GetMagicListHex(bot->classInfo->classCode, bot->configIndex);
+
+		// CRITICAL: Check hex data validity
+		if (!invHex || !magicHex || strlen(invHex) < 10 || strlen(magicHex) < 10)
+		{
+			LogAdd(LOG_RED, "[CreateBots] Invalid hex data for class %d in config %d",
+				bot->classInfo->classCode, bot->configIndex);
+			fclose(sqlFile);
+			free(botList);
+			return false;
+		}
+
+		fprintf(sqlFile, "-- Bot %d: %s (%s - %s) [Config %d]\n",
+			i + 1, bot->account, bot->charName, bot->classInfo->className, bot->configIndex);
+
+		// MEMB_INFO
+		fprintf(sqlFile, "IF NOT EXISTS (SELECT 1 FROM MEMB_INFO WHERE memb___id = '%s')\n", bot->account);
+		fprintf(sqlFile, "BEGIN\n");
+		fprintf(sqlFile, "    INSERT INTO MEMB_INFO (memb___id, memb__pwd, memb_name, sno__numb, mail_addr, bloc_code, ctl1_code)\n");
+		fprintf(sqlFile, "    VALUES ('%s', '123456', '%s', '123456789', 'bot@email.com', 0, 0)\n", bot->account, bot->account);
+		fprintf(sqlFile, "END\n\n");
+
+		// Character
+		fprintf(sqlFile, "IF NOT EXISTS (SELECT 1 FROM Character WHERE Name = '%s')\n", bot->charName);
+		fprintf(sqlFile, "BEGIN\n");
+		fprintf(sqlFile, "    INSERT INTO Character (Name, cLevel, Class, Strength, Dexterity, Vitality, Energy, Leadership, Money, MapNumber, MapPosX, MapPosY, AccountID, Inventory, MagicList)\n");
+		fprintf(sqlFile, "    VALUES ('%s', %d, %d, %d, %d, %d, %d, %d, 20000000, %d, %d, %d, '%s', %s, %s)\n",
+			bot->charName, bot->level, bot->classInfo->classCode,
+			bot->classInfo->str, bot->classInfo->dex, bot->classInfo->vit,
+			bot->classInfo->ene, bot->classInfo->cmd,
+			mapNumber, bot->finalMapX, bot->finalMapY, bot->account, invHex, magicHex);
+		fprintf(sqlFile, "END\n\n");
+
+		// AccountCharacter
+		fprintf(sqlFile, "IF NOT EXISTS (SELECT 1 FROM AccountCharacter WHERE Id = '%s')\n", bot->account);
+		fprintf(sqlFile, "    INSERT INTO AccountCharacter (Id, GameID1) VALUES ('%s', '%s')\n", bot->account, bot->charName);
+		fprintf(sqlFile, "ELSE\n");
+		fprintf(sqlFile, "    UPDATE AccountCharacter SET GameID1 = '%s' WHERE Id = '%s'\n\n", bot->charName, bot->account);
+
+		// Flush periodically
+		if ((i + 1) % 10 == 0)
+		{
+			fflush(sqlFile);
+			if ((i + 1) % 50 == 0)
+			{
+				LogAdd(LOG_BLUE, "[CreateBots] SQL: %d/%d", i + 1, botCount);
+			}
+		}
+	}
+
+	fprintf(sqlFile, "\nPRINT 'Created %d bots (Bot%04d-Bot%04d) with %d config variations'\nGO\n",
+		botCount, startFrom, startFrom + botCount - 1, __popcnt(enabledConfigs));
+	fflush(sqlFile);
+	fclose(sqlFile);
+
+	// CRITICAL: Free memory
+	free(botList);
+
+	LogAdd(LOG_GREEN, "[CreateBots] COMPLETED: %d bots with %d config variations",
+		botCount, __popcnt(enabledConfigs));
+	return true;
 }
 
 LRESULT CALLBACK About(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam) // OK

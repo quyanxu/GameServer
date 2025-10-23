@@ -296,7 +296,8 @@ public:
 	bool CommandMoney(LPOBJ lpObj,char* arg);
 	bool CommandChange(LPOBJ lpObj,char* arg,int Npc);
 	bool CommandWare(LPOBJ lpObj,char* arg);
-	bool CommandReset(LPOBJ lpObj,char* arg,int Npc);
+	//bool CommandReset(LPOBJ lpObj,char* arg,int Npc);
+	bool CommandReset(LPOBJ lpObj, char* arg, int Npc, bool isBotAutoReset = true);
 	void CommandResetAuto(LPOBJ lpObj,char* arg,int Npc);
 	bool CommandGMMove(LPOBJ lpObj,char* arg);
 	bool CommandGMPost(LPOBJ lpObj,char* arg);

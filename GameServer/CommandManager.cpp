@@ -1050,17 +1050,30 @@ bool CCommandManager::CommandWare(LPOBJ lpObj,char* arg) // OK
 	return 1;
 }
 
-bool CCommandManager::CommandReset(LPOBJ lpObj,char* arg,int Npc) // OK
+bool CCommandManager::CommandReset(LPOBJ lpObj, char* arg, int Npc, bool isBotAutoReset)
 {
-	char mode[5] = {0};
+	char mode[5] = { 0 };
+	this->GetString(arg, mode, sizeof(mode), 0);
 
-	this->GetString( arg,mode,sizeof(mode), 0 );
-
-	if( strcmp( mode,"auto" ) == 0 )
-	{
-		this->CommandResetAuto( lpObj, arg, Npc );
+	if (strcmp(mode, "auto") == 0) {
+		this->CommandResetAuto(lpObj, arg, Npc);
 		return 1;
 	}
+
+	// **Allow bots to skip interface checks**
+	if (!isBotAutoReset) {
+		if (lpObj->Interface.use != 0 || lpObj->State == OBJECT_DELCMD ||
+			lpObj->DieRegen != 0 || lpObj->Teleport != 0 ||
+			lpObj->PShopOpen != 0 || lpObj->SkillSummonPartyTime != 0) {
+
+			gNotice.GCNoticeSend(lpObj->Index, 1, 0, 0, 0, 0, 0, gMessage.GetMessage(90));
+			if (Npc >= 0) {
+				GCChatTargetNewSend(lpObj, Npc, gMessage.GetMessage(90));
+			}
+			return 0;
+		}
+	}
+
 
 	if(lpObj->Interface.use != 0 || lpObj->State == OBJECT_DELCMD || lpObj->DieRegen != 0 || lpObj->Teleport != 0 || lpObj->PShopOpen != 0 || lpObj->SkillSummonPartyTime != 0)
 	{
@@ -2110,6 +2123,81 @@ void CCommandManager::DGCommandResetRecv(SDHP_COMMAND_RESET_RECV* lpMsg) // OK
 
 	lpObj->AutoAddPointStats[4] = lpObj->AutoResetStats[4];
 
+
+
+	// **AUTO-DISTRIBUTE POINTS FOR BOTS AFTER RESET**
+	if (lpObj->IsFakeOnlineBot && gServerInfo.m_CommandResetType == 1)
+	{
+		int availablePoints = lpObj->LevelUpPoint;
+		const int MAX_STAT = 65000; // Maximum points per stat
+
+		if (availablePoints > 0)
+		{
+			if (lpObj->Class == CLASS_DL)
+			{
+				// Dark Lord: 20% each to STR, AGI, VIT, ENE, CMD
+				int pointsPerStat = availablePoints / 5;
+				int remainder = availablePoints % 5;
+
+				// Calculate how many points can actually be added to each stat
+				int strAdd = min(pointsPerStat, MAX_STAT - lpObj->Strength);
+				int agiAdd = min(pointsPerStat, MAX_STAT - lpObj->Dexterity);
+				int vitAdd = min(pointsPerStat, MAX_STAT - lpObj->Vitality);
+				int eneAdd = min(pointsPerStat, MAX_STAT - lpObj->Energy);
+				int cmdAdd = min(pointsPerStat + remainder, MAX_STAT - lpObj->Leadership);
+
+				lpObj->Strength += strAdd;
+				lpObj->Dexterity += agiAdd;
+				lpObj->Vitality += vitAdd;
+				lpObj->Energy += eneAdd;
+				lpObj->Leadership += cmdAdd;
+
+				int pointsUsed = strAdd + agiAdd + vitAdd + eneAdd + cmdAdd;
+				lpObj->LevelUpPoint = availablePoints - pointsUsed;
+
+				LogAdd(LOG_EVENT, "[BotAutoDistribute][%s] DL distributed %d/%d points (STR:%d AGI:%d VIT:%d ENE:%d CMD:%d) - Remaining:%d",
+					lpObj->Name, pointsUsed, availablePoints, strAdd, agiAdd, vitAdd, eneAdd, cmdAdd, lpObj->LevelUpPoint);
+
+				if (lpObj->LevelUpPoint > 0) {
+					LogAdd(LOG_ORANGE, "[BotAutoDistribute][%s] WARNING: Could not distribute %d points - stats at max",
+						lpObj->Name, lpObj->LevelUpPoint);
+				}
+			}
+			else
+			{
+				// Other classes: 25% each to STR, AGI, VIT, ENE
+				int pointsPerStat = availablePoints / 4;
+				int remainder = availablePoints % 4;
+
+				int strAdd = min(pointsPerStat, MAX_STAT - lpObj->Strength);
+				int agiAdd = min(pointsPerStat, MAX_STAT - lpObj->Dexterity);
+				int vitAdd = min(pointsPerStat, MAX_STAT - lpObj->Vitality);
+				int eneAdd = min(pointsPerStat + remainder, MAX_STAT - lpObj->Energy);
+
+				lpObj->Strength += strAdd;
+				lpObj->Dexterity += agiAdd;
+				lpObj->Vitality += vitAdd;
+				lpObj->Energy += eneAdd;
+
+				int pointsUsed = strAdd + agiAdd + vitAdd + eneAdd;
+				lpObj->LevelUpPoint = availablePoints - pointsUsed;
+
+				LogAdd(LOG_EVENT, "[BotAutoDistribute][%s] Class %d distributed %d/%d points (STR:%d AGI:%d VIT:%d ENE:%d) - Remaining:%d",
+					lpObj->Name, lpObj->Class, pointsUsed, availablePoints, strAdd, agiAdd, vitAdd, eneAdd, lpObj->LevelUpPoint);
+
+				if (lpObj->LevelUpPoint > 0) {
+					LogAdd(LOG_ORANGE, "[BotAutoDistribute][%s] WARNING: Could not distribute %d points - stats at max",
+						lpObj->Name, lpObj->LevelUpPoint);
+				}
+			}
+
+			// Recalculate attributes after point distribution
+			gObjectManager.CharacterCalcAttribute(lpObj->Index);
+			GCNewCharacterInfoSend(lpObj);
+		}
+	}
+
+
 	lpObj->AutoAddPointCount = ((lpObj->AutoAddPointStats[0]>0)?(lpObj->AutoAddPointCount+1):lpObj->AutoAddPointCount);
 
 	lpObj->AutoAddPointCount = ((lpObj->AutoAddPointStats[1]>0)?(lpObj->AutoAddPointCount+1):lpObj->AutoAddPointCount);
@@ -2270,6 +2358,68 @@ void CCommandManager::DGCommandMasterResetRecv(SDHP_COMMAND_MASTER_RESET_RECV* l
 	gObjectManager.CharacterCalcAttribute(lpObj->Index);
 
 	gRewardSystem.GetRewardByReset( lpObj );
+
+
+
+
+	// **AUTO-DISTRIBUTE POINTS FOR BOTS AFTER MASTER RESET**
+	if (lpObj->IsFakeOnlineBot && gServerInfo.m_CommandMasterResetType == 1)
+	{
+		int availablePoints = lpObj->LevelUpPoint;
+		const int MAX_STAT = 65000;
+
+		if (availablePoints > 0)
+		{
+			if (lpObj->Class == CLASS_DL)
+			{
+				int pointsPerStat = availablePoints / 5;
+				int remainder = availablePoints % 5;
+
+				int strAdd = min(pointsPerStat, MAX_STAT - lpObj->Strength);
+				int agiAdd = min(pointsPerStat, MAX_STAT - lpObj->Dexterity);
+				int vitAdd = min(pointsPerStat, MAX_STAT - lpObj->Vitality);
+				int eneAdd = min(pointsPerStat, MAX_STAT - lpObj->Energy);
+				int cmdAdd = min(pointsPerStat + remainder, MAX_STAT - lpObj->Leadership);
+
+				lpObj->Strength += strAdd;
+				lpObj->Dexterity += agiAdd;
+				lpObj->Vitality += vitAdd;
+				lpObj->Energy += eneAdd;
+				lpObj->Leadership += cmdAdd;
+
+				int pointsUsed = strAdd + agiAdd + vitAdd + eneAdd + cmdAdd;
+				lpObj->LevelUpPoint = availablePoints - pointsUsed;
+
+				LogAdd(LOG_EVENT, "[BotAutoDistribute][MReset][%s] DL distributed %d/%d points - Remaining:%d",
+					lpObj->Name, pointsUsed, availablePoints, lpObj->LevelUpPoint);
+			}
+			else
+			{
+				int pointsPerStat = availablePoints / 4;
+				int remainder = availablePoints % 4;
+
+				int strAdd = min(pointsPerStat, MAX_STAT - lpObj->Strength);
+				int agiAdd = min(pointsPerStat, MAX_STAT - lpObj->Dexterity);
+				int vitAdd = min(pointsPerStat, MAX_STAT - lpObj->Vitality);
+				int eneAdd = min(pointsPerStat + remainder, MAX_STAT - lpObj->Energy);
+
+				lpObj->Strength += strAdd;
+				lpObj->Dexterity += agiAdd;
+				lpObj->Vitality += vitAdd;
+				lpObj->Energy += eneAdd;
+
+				int pointsUsed = strAdd + agiAdd + vitAdd + eneAdd;
+				lpObj->LevelUpPoint = availablePoints - pointsUsed;
+
+				LogAdd(LOG_EVENT, "[BotAutoDistribute][MReset][%s] Class %d distributed %d/%d points - Remaining:%d",
+					lpObj->Name, lpObj->Class, pointsUsed, availablePoints, lpObj->LevelUpPoint);
+			}
+
+			gObjectManager.CharacterCalcAttribute(lpObj->Index);
+		}
+	}
+
+
 
 	GCNewCharacterInfoSend(lpObj);
 
